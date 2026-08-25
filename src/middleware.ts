@@ -2,6 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isRouteAllowed, type UserRole } from "@/lib/permissions";
 
+type CookieToSet = {
+  name: string;
+  value: string;
+  options?: Record<string, unknown>;
+};
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -13,11 +19,28 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+
+        setAll(cookiesToSet: CookieToSet[]) {
+          cookiesToSet.forEach(
+            ({ name, value }: { name: string; value: string }) => {
+              request.cookies.set(name, value);
+            }
+          );
+
           response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
+
+          cookiesToSet.forEach(
+            ({
+              name,
+              value,
+              options,
+            }: {
+              name: string;
+              value: string;
+              options?: Record<string, unknown>;
+            }) => {
+              response.cookies.set(name, value, options);
+            }
           );
         },
       },
@@ -41,9 +64,6 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Fetch the real role from the DB — this is what makes role checks
-  // trustworthy. A user can't fake being ADMIN by editing localStorage
-  // like the old demo-session model allowed.
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
