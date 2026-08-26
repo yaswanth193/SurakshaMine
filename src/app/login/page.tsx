@@ -99,11 +99,11 @@ function LoginForm() {
                   onChange={(e) => handleRoleSelect(e.target.value)}
                   className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
                 >
-                  <option value="ADMIN">Admin (Admin Kumar)</option>
-                  <option value="CORPORATE_MANAGEMENT">Corporate Management (Priya Sharma)</option>
-                  <option value="MINE_MANAGER">Mine Manager (Rajesh Verma)</option>
-                  <option value="INSPECTOR">Inspector (Arun Singh)</option>
-                  <option value="REGULATORY_AUTHORITY">Regulatory Authority (Meera Patel)</option>
+                  <option value="ADMIN">Admin </option>
+                  <option value="CORPORATE_MANAGEMENT">Corporate Management </option>
+                  <option value="MINE_MANAGER">Mine Manager </option>
+                  <option value="INSPECTOR">Inspection</option>
+                  <option value="REGULATORY_AUTHORITY">Regulatory Authority </option>
                 </select>
               </div>
 
