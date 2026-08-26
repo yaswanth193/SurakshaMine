@@ -81,7 +81,7 @@ function LoginForm() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <span className="text-3xl">⛏️</span>
-            <span className="text-2xl font-bold">Coal<span className="text-yellow-600">Gov</span>360</span>
+            <span className="text-2xl font-bold">Suraksha<span className="text-yellow-600">Mine</span></span>
           </Link>
           <p className="mt-2 text-gray-600 dark:text-gray-400">Sign in to your account</p>
         </div>
