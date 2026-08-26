@@ -27,6 +27,7 @@ import {
   Sun,
   Moon,
   User,
+  Users,
   Settings,
   HelpCircle,
   LogOut,
@@ -44,6 +45,7 @@ const navItems = [
   { href: "/inspections", label: "Inspections", icon: ClipboardList },
   { href: "/incidents", label: "Incidents", icon: AlertTriangle },
   { href: "/gis", label: "GIS Map", icon: Layers },
+  {href:"/employees",label:"Employees",icon: Users},
   { href: "/ai-insights", label: "AI Insights", icon: BrainCircuit },
 ];
 
@@ -85,6 +87,15 @@ export function Header() {
     toast.success("All notifications cleared!");
   };
 
+  const timeAgo = (iso: string) => {
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-gray-950/95 border-gray-200 dark:border-gray-800">
       <div className="flex h-16 items-center px-4 md:px-6 gap-4">
@@ -94,8 +105,8 @@ export function Header() {
             <span className="text-lg font-bold">⛏</span>
           </div>
           <div>
-            <span className="font-bold text-lg tracking-tight">Coal<span className="text-yellow-600">Gov</span>360</span>
-            <span className="ml-2 hidden text-xs text-gray-500 md:inline-block">· SIH 2026</span>
+            <span className="font-bold text-lg tracking-tight">Suraksha<span className="text-yellow-600">Mine</span></span>
+            
           </div>
         </Link>
 
@@ -129,14 +140,57 @@ export function Header() {
             />
           </div>
 
-          <Button variant="ghost" size="icon" className="relative" onClick={handleClearNotifications}>
-            <Bell className="h-5 w-5" />
-            {notificationCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white animate-pulse">
-                {notificationCount}
-              </span>
-            )}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                {notificationCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white animate-pulse">
+                    {notificationCount}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-80" align="end">
+              <div className="flex items-center justify-between px-2 py-1.5">
+                <DropdownMenuLabel className="p-0">Notifications</DropdownMenuLabel>
+                {notificationCount > 0 && (
+                  <button
+                    className="text-xs font-medium text-yellow-700 hover:underline dark:text-yellow-500"
+                    onClick={handleClearNotifications}
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <DropdownMenuSeparator />
+              {activities.length === 0 ? (
+                <div className="px-2 py-6 text-center text-sm text-gray-500">No notifications yet</div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto">
+                  {activities.slice(0, 8).map((activity) => (
+                    <DropdownMenuItem
+                      key={activity.id}
+                      className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
+                      onClick={() => !activity.read && markRead.mutate(activity.id)}
+                    >
+                      <div className="flex w-full items-start gap-2">
+                        {!activity.read && (
+                          <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-yellow-600" />
+                        )}
+                        <p className={`text-sm ${activity.read ? "text-gray-500" : "font-medium"}`}>
+                          {activity.message}
+                        </p>
+                      </div>
+                      <span className="pl-3.5 text-xs text-gray-400">
+                        {activity.mine_name ?? "All Mines"} · {timeAgo(activity.created_at)}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                </div>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button
             variant="ghost"

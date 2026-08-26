@@ -23,6 +23,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/settings",
     "/profile",
     "/ai-insights"
+    
   ],
   CORPORATE_MANAGEMENT: [
     "/dashboard",
@@ -44,7 +45,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/reports",
     "/profile",
     "/settings",
-    "/ai-insights"
+    "/ai-insights",
+    "/employees"
   ],
   INSPECTOR: [
     "/inspections",
