@@ -23,7 +23,7 @@ export default function HomePage() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
             <span className="text-2xl">⛏️</span>
-            <span className="text-xl font-bold">Coal<span className="text-yellow-600">Gov</span>360</span>
+            <span className="text-xl font-bold">Suraksha<span className="text-yellow-600">Mine</span></span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/login">
@@ -62,9 +62,7 @@ export default function HomePage() {
                     Get Started <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-                <Button size="lg" variant="outline">
-                  Watch Demo
-                </Button>
+                
               </div>
               <div className="mt-8 flex flex-wrap gap-6 text-sm">
                 <div className="flex items-center gap-2">
@@ -180,7 +178,7 @@ export default function HomePage() {
               <span className="font-bold">Coal<span className="text-yellow-600">Gov</span>360</span>
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              © 2026 Team CoalGuardians · SIH 2026
+              © 2026 Team SurakshaMine · SIH 2026
             </div>
             <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
               <Link href="#" className="hover:text-yellow-600">Privacy</Link>
