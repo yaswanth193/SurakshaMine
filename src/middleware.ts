@@ -53,7 +53,16 @@ export async function middleware(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
 
-  if (path === "/" || path === "/login") {
+  // Public: the employee incident-alert enrolment page has no
+  // SurakshaMine login of its own, and the subscribe endpoint it
+  // calls is meant to be reachable from an employee's own phone.
+  // const isPublicAlertsPath =
+  //   path.startsWith("/alerts/") || path === "/api/push/subscribe";
+
+  const isPublicAlertsPath =
+    path.startsWith("/alerts/") || path === "/api/push/subscribe" || path === "/sw.js";
+
+  if (path === "/" || path === "/login" || isPublicAlertsPath) {
     return response;
   }
 

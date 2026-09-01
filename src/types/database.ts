@@ -119,6 +119,18 @@ export interface Profile {
   created_at: string;
 }
 
+export interface PushSubscriptionRow {
+  id: string;
+  employee_id: string;
+  employee_name: string | null;
+  mine_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth_key: string;
+  user_agent: string | null;
+  created_at: string;
+}
+
 export interface DashboardStats {
   totalMines: number;
   complianceScore: number;

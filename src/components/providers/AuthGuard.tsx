@@ -17,9 +17,13 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   // from restricted routes server-side — this client-side check is a
   // fast UI fallback for the moment before that redirect lands, and for
   // role changes that happen mid-session.
-  if (pathname === "/" || pathname === "/login") {
+  // if (pathname === "/" || pathname === "/login") {
+  //   return <>{children}</>;
+  // }
+
+  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/alerts/")) {
     return <>{children}</>;
-  }
+}
 
   if (loading) {
     return (

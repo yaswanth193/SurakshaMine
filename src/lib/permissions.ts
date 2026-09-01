@@ -22,7 +22,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/users",
     "/settings",
     "/profile",
-    "/ai-insights"
+    "/ai-insights",
+    "/api/push"
     
   ],
   CORPORATE_MANAGEMENT: [
@@ -34,7 +35,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/reports",
     "/profile",
     "/settings",
-    "/ai-insights"
+    "/ai-insights",
+    "/api/push"
   ],
   MINE_MANAGER: [
     "/dashboard",
@@ -46,7 +48,8 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/profile",
     "/settings",
     "/ai-insights",
-    "/employees"
+    "/employees",
+    "/api/push"
   ],
   INSPECTOR: [
     "/inspections",
