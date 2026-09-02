@@ -1157,7 +1157,13 @@ export default function DashboardPage() {
 
   const activeMineId = useMemo(() => {
     if (session?.role === "MINE_MANAGER") {
-      return session.mineId || "M1";
+      // session.mineId is a real Supabase mine UUID, but the demo
+      // data below is keyed by mock ids ("M1".."M6"). If the
+      // manager's real mine doesn't exist in the demo set, fall
+      // back to showing everything rather than silently filtering
+      // every list down to empty.
+      const hasMatchingDemoMine = mockMines.some((m) => m.id === session.mineId);
+      return session.mineId && hasMatchingDemoMine ? session.mineId : "all";
     }
     return selectedMineId;
   }, [session, selectedMineId]);
