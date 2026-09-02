@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
       )
     )
   );
+    console.log("PUSH RESULTS:", JSON.stringify(results, null, 2));
 
   const sent = results.filter((r) => r.ok).length;
   const failed = results.length - sent;
