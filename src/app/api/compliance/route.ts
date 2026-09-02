@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       assigned_to: body.assignedTo,
       description: body.description ?? "",
       due_date: body.dueDate,
+      document_name: body.documentName ?? null,
     })
     .select("*, mines(name)")
     .single();

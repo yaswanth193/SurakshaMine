@@ -32,6 +32,8 @@ export function useCreateCompliance() {
       description?: string;
       dueDate: string;
       priority?: string;
+      status?: string;
+      documentName?: string;
     }) => axios.post("/api/compliance", payload).then((r) => r.data.data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["compliance"] }),
   });

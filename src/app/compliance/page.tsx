@@ -26,9 +26,32 @@ import {
   Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
-import { complianceService, getUpdatedStatus, type ComplianceItem, type Mine } from "@/lib/complianceService";
 import { downloadCSV } from "@/lib/exportUtils";
 import { useSession } from "@/hooks/useSession";
+import { useCompliance, useCreateCompliance, useUpdateComplianceStatus } from "@/hooks/useCompliance";
+import { useMines } from "@/hooks/useMines";
+import type { ComplianceItem } from "@/types/database";
+
+// Responsible-person list — assigned_to is a free-text column in the
+// database (not a foreign key), so this is just a convenience list for
+// the dropdown. Replace with real profile names once there's a
+// GET /api/profiles endpoint to pull them from.
+const RESPONSIBLE_PERSONS = ["Dr. Sharma", "Mr. Verma", "Ms. Patel", "Mr. Singh", "Er. Reddy"];
+
+// Computes the *effective* status for display: if something is still
+// marked "pending" in the database but its due date has passed, show
+// it as overdue without needing a cron job to flip the stored value.
+function getUpdatedStatus(item: { due_date: string; status: string }): string {
+  if (item.status === "completed") return "completed";
+  try {
+    const dueTime = new Date(item.due_date).getTime();
+    const now = Date.now();
+    if (dueTime < now) return "overdue";
+  } catch {
+    // fall through
+  }
+  return item.status;
+}
 
 const getStatusBadge = (status: string) => {
   const styles = {
@@ -54,10 +77,8 @@ const formatDateShort = (dateStr: string) => {
 };
 
 export default function CompliancePage() {
-  const [items, setItems] = useState<ComplianceItem[]>([]);
-  const [mines, setMines] = useState<Mine[]>([]);
-  const [users, setUsers] = useState<string[]>([]);
-  
+  const users = RESPONSIBLE_PERSONS;
+
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   
@@ -93,16 +114,18 @@ export default function CompliancePage() {
     dateRange: "all"
   });
 
-  useEffect(() => {
-    setItems(complianceService.getComplianceItems());
-    setMines(complianceService.getMines());
-    setUsers(complianceService.getUsers());
-  }, []);
+  // Live data from Supabase — replaces the old localStorage-backed
+  // complianceService. useCompliance() also subscribes to realtime
+  // changes, so this list updates automatically for every user.
+  const { data: items = [], isLoading: itemsLoading } = useCompliance();
+  const { data: mines = [] } = useMines();
+  const createCompliance = useCreateCompliance();
+  const updateStatus = useUpdateComplianceStatus();
 
   useEffect(() => {
     if (session?.role === "MINE_MANAGER") {
-      setFilterMineId(session.mineId || "M1");
-      setAppliedFilters(prev => ({ ...prev, mineId: session.mineId || "M1" }));
+      setFilterMineId(session.mineId || "all");
+      setAppliedFilters(prev => ({ ...prev, mineId: session.mineId || "all" }));
     }
   }, [session]);
 
@@ -123,14 +146,14 @@ export default function CompliancePage() {
       const rows = filteredData.map(item => [
         item.id,
         item.title,
-        item.mineName,
+        item.mine_name ?? "",
         item.category,
-        item.assignedTo,
-        item.dueDate,
+        item.assigned_to,
+        item.due_date,
         item.priority,
         getUpdatedStatus(item),
         item.description,
-        item.createdAt || ""
+        item.created_at || ""
       ]);
       const dateStr = new Date().toISOString().split("T")[0];
       downloadCSV(headers, rows, `coalgov360-compliance-${dateStr}.csv`);
@@ -178,39 +201,38 @@ export default function CompliancePage() {
       return;
     }
 
-    const mineObj = mines.find(m => m.id === mineId);
-    const mineName = mineObj ? mineObj.name : "Unknown Mine";
-
-    complianceService.createComplianceItem({
-      title,
-      mineId,
-      mineName,
-      status,
-      dueDate,
-      priority,
-      category,
-      assignedTo,
-      description,
-      documentName: documentName || undefined
-    });
-
-    // Refresh state
-    setItems(complianceService.getComplianceItems());
-    toast.success("Compliance item created successfully!");
-    handleCloseModal();
+    createCompliance.mutate(
+      {
+        title,
+        mineId,
+        category,
+        assignedTo,
+        description,
+        dueDate,
+        priority,
+        status,
+        documentName: documentName || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Compliance item created successfully!");
+          handleCloseModal();
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.error ?? "Failed to create compliance item.");
+        },
+      }
+    );
   };
 
   const handleCompleteItem = (id: string) => {
-    const allItems = complianceService.getComplianceItems();
-    const updated = allItems.map(item => {
-      if (item.id === id) {
-        return { ...item, status: "completed" as const };
+    updateStatus.mutate(
+      { id, status: "completed" },
+      {
+        onSuccess: () => toast.success("Compliance status marked as Completed!"),
+        onError: (err: any) => toast.error(err?.response?.data?.error ?? "Failed to update status."),
       }
-      return item;
-    });
-    localStorage.setItem("coalgov360_compliance", JSON.stringify(updated));
-    setItems(complianceService.getComplianceItems());
-    toast.success("Compliance status marked as Completed!");
+    );
   };
 
   const activeFiltersCount = [
@@ -236,7 +258,7 @@ export default function CompliancePage() {
 
   const handleResetFilters = () => {
     const isManager = session?.role === "MINE_MANAGER";
-    const initialMine = isManager ? (session.mineId || "M1") : "all";
+    const initialMine = isManager ? (session.mineId || "all") : "all";
     setFilterMineId(initialMine);
     setFilterCategory("all");
     setFilterStatusField("all");
@@ -256,7 +278,7 @@ export default function CompliancePage() {
   const filteredData = items.filter(item => {
     // 1. Search Query
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.mineName.toLowerCase().includes(searchQuery.toLowerCase());
+                          (item.mine_name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     if (!matchesSearch) return false;
 
     // 2. Status Tab Filter
@@ -276,9 +298,9 @@ export default function CompliancePage() {
     // 3. Applied Mine Filter
     let activeMine = appliedFilters.mineId;
     if (session && session.role === "MINE_MANAGER") {
-      activeMine = session.mineId || "M1";
+      activeMine = session.mineId || "all";
     }
-    if (activeMine !== "all" && item.mineId !== activeMine) return false;
+    if (activeMine !== "all" && item.mine_id !== activeMine) return false;
 
     // 4. Applied Category Filter
     if (appliedFilters.category !== "all" && item.category !== appliedFilters.category) return false;
@@ -291,7 +313,7 @@ export default function CompliancePage() {
 
     // 7. Applied Date Range Filter
     if (appliedFilters.dateRange !== "all") {
-      const dueDate = new Date(item.dueDate);
+      const dueDate = new Date(item.due_date);
       const now = new Date();
       now.setHours(0,0,0,0);
       
@@ -313,7 +335,12 @@ export default function CompliancePage() {
     return true;
   });
 
-  const stats = complianceService.calculateComplianceStats(items);
+  const stats = {
+    total: items.length,
+    overdue: items.filter(i => getUpdatedStatus(i) === "overdue").length,
+    pending: items.filter(i => { const s = getUpdatedStatus(i); return s === "pending" || s === "in-progress"; }).length,
+    completed: items.filter(i => getUpdatedStatus(i) === "completed").length,
+  };
 
   return (
     <>
@@ -414,7 +441,9 @@ export default function CompliancePage() {
                 <span>Due Date</span>
                 <span className="text-right">Action</span>
               </div>
-              {filteredData.length === 0 ? (
+              {itemsLoading ? (
+                <div className="p-12 text-center text-sm text-gray-500">Loading compliance tasks…</div>
+              ) : filteredData.length === 0 ? (
                 <div className="p-12 text-center text-gray-500 dark:text-gray-400 flex flex-col items-center justify-center gap-4">
                   <div className="h-12 w-12 rounded-full bg-gray-50 dark:bg-gray-900 flex items-center justify-center border border-gray-100 dark:border-gray-800">
                     <Filter className="h-5 w-5 text-gray-400" />
@@ -440,10 +469,10 @@ export default function CompliancePage() {
                   >
                     <div className="col-span-2">
                       <p className="font-medium text-sm">{item.title}</p>
-                      <p className="text-xs text-gray-500">Assigned to: {item.assignedTo} · <span className="font-semibold text-yellow-600">{item.category}</span></p>
+                      <p className="text-xs text-gray-500">Assigned to: {item.assigned_to} · <span className="font-semibold text-yellow-600">{item.category}</span></p>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-sm">{item.mineName}</span>
+                      <span className="text-sm">{item.mine_name}</span>
                     </div>
                     <div className="flex items-center">
                       <Badge className={getStatusBadge(getUpdatedStatus(item))}>
@@ -452,7 +481,7 @@ export default function CompliancePage() {
                     </div>
                     <div className="flex items-center">
                       <span className="text-sm flex items-center gap-1">
-                        <Calendar className="h-3 w-3" /> {formatDateShort(item.dueDate)}
+                        <Calendar className="h-3 w-3" /> {formatDateShort(item.due_date)}
                       </span>
                     </div>
                     <div className="flex items-center justify-end gap-1">
@@ -650,7 +679,9 @@ export default function CompliancePage() {
 
             <DialogFooter className="mt-6 flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleCloseModal}>Cancel</Button>
-              <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700 text-white">Create Compliance</Button>
+              <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700 text-white" disabled={createCompliance.isPending}>
+                {createCompliance.isPending ? "Creating..." : "Create Compliance"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
@@ -681,7 +712,7 @@ export default function CompliancePage() {
               <div className="grid grid-cols-2 gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase">Mine Location</p>
-                  <p className="font-medium text-gray-900 dark:text-white mt-1">{selectedItem.mineName}</p>
+                  <p className="font-medium text-gray-900 dark:text-white mt-1">{selectedItem.mine_name}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase">Category</p>
@@ -692,12 +723,12 @@ export default function CompliancePage() {
               <div className="grid grid-cols-2 gap-4 border-b border-gray-100 dark:border-gray-800 pb-4">
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase">Responsible Person</p>
-                  <p className="font-medium text-gray-900 dark:text-white mt-1">{selectedItem.assignedTo}</p>
+                  <p className="font-medium text-gray-900 dark:text-white mt-1">{selectedItem.assigned_to}</p>
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase">Due Date</p>
                   <p className="font-medium text-gray-900 dark:text-white flex items-center gap-1.5 mt-1">
-                    <Calendar className="h-4 w-4 text-gray-400 shrink-0" /> {new Date(selectedItem.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    <Calendar className="h-4 w-4 text-gray-400 shrink-0" /> {new Date(selectedItem.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
               </div>
@@ -710,7 +741,7 @@ export default function CompliancePage() {
                 <div>
                   <p className="text-xs font-semibold text-gray-400 uppercase">Reference Document</p>
                   <p className="font-medium text-yellow-600 mt-1 cursor-pointer hover:underline">
-                    {selectedItem.documentName || "No attached document"}
+                    {selectedItem.document_name || "No attached document"}
                   </p>
                 </div>
               </div>
