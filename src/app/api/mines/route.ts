@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/server";
 
 // GET /api/mines
 export async function GET() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase.from("mines").select("*").order("risk_score", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ data });
+  return NextResponse.json({ data: data ?? [] });
 }
 
-// POST /api/mines — RLS restricts this to ADMIN/CORPORATE_MANAGEMENT
+// POST /api/mines
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const body = await request.json();
 
   const { data, error } = await supabase

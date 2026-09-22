@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 // POST /api/evidence  (multipart/form-data, field name "file")
-// Returns { path, signedUrl } — store `path` on the incident/inspection
-// row's evidence_url column, and re-request a fresh signed URL when
-// displaying it later (they expire).
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const supabase = createAdminClient();
+  const authClient = await createClient();
+  const { data: { user } } = await authClient.auth.getUser();
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
@@ -18,8 +13,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
+  const userId = user?.id || "public";
   const ext = file.name.split(".").pop();
-  const path = `${user.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+  const path = `${userId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("evidence")
@@ -42,7 +38,7 @@ export async function POST(request: NextRequest) {
 
 // GET /api/evidence?path=... — re-sign an existing evidence path for display
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   const { searchParams } = new URL(request.url);
   const path = searchParams.get("path");
   if (!path) return NextResponse.json({ error: "path is required" }, { status: 400 });

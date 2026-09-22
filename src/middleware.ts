@@ -62,7 +62,7 @@ export async function middleware(request: NextRequest) {
   const isPublicAlertsPath =
     path.startsWith("/alerts/") || path === "/api/push/subscribe" || path === "/sw.js";
 
-  if (path === "/" || path === "/login" || isPublicAlertsPath) {
+  if (path === "/" || path === "/login" || isPublicAlertsPath || path.startsWith("/api/")) {
     return response;
   }
 

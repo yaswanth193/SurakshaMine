@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,10 +31,12 @@ import {
   Navigation,
 } from "lucide-react";
 import { toast } from "sonner";
-import { incidentService, type IncidentItem } from "@/lib/incidentService";
-import { complianceService, type Mine } from "@/lib/complianceService";
+import { useIncidents, useCreateIncident, useUpdateIncidentStatus } from "@/hooks/useIncidents";
+import { useMines } from "@/hooks/useMines";
+import { useSession } from "@/hooks/useSession";
 import { downloadCSV } from "@/lib/exportUtils";
-import { inspectionService, mineZones, defaultZones } from "@/lib/inspectionService";
+import { inspectionService, defaultZones } from "@/lib/inspectionService";
+import type { Incident } from "@/types/database";
 
 const getStatusBadge = (status: string) => {
   const styles = {
@@ -76,14 +78,51 @@ const getTypeIcon = (type: string) => {
 };
 
 export default function IncidentsPage() {
-  const [items, setItems] = useState<IncidentItem[]>([]);
-  const [mines, setMines] = useState<Mine[]>([]);
+  const { session } = useSession();
+  const isMineManager = session?.role === "MINE_MANAGER";
+  const canReport = session?.role !== "CORPORATE_MANAGEMENT" && session?.role !== "REGULATORY_AUTHORITY";
+  const canResolve = session?.role === "ADMIN" || session?.role === "MINE_MANAGER" || session?.role === "INSPECTOR";
+  const managerMineId = isMineManager ? session?.mineId : undefined;
+  const { data: dbIncidents = [], isLoading } = useIncidents(
+    managerMineId ? { mineId: managerMineId } : {}
+  );
+  const { data: dbMines = [] } = useMines();
+  const createIncident = useCreateIncident();
+  const updateIncidentStatus = useUpdateIncidentStatus();
+
+  const mines = useMemo(() => {
+    return dbMines.map(m => ({
+      id: m.id,
+      name: m.name,
+      location: m.location,
+      zones: m.zones || [],
+    }));
+  }, [dbMines]);
+
+  const items = useMemo(() => {
+    return dbIncidents.map(i => ({
+      ...i,
+      mineId: i.mine_id,
+      mineName: i.mine_name || mines.find(m => m.id === i.mine_id)?.name || "Unknown Mine",
+      zoneName: i.zone_name || "",
+      incidentDate: i.incident_date,
+      incidentTime: i.incident_time,
+      reportedBy: i.reported_by,
+      immediateAction: i.immediate_action || undefined,
+      rootCause: i.root_cause || undefined,
+      evidenceName: i.evidence_url || undefined,
+      locationSource: (i.location_source || undefined) as "GPS" | "Fallback" | undefined,
+      date: i.incident_date,
+      mine: i.mine_name || mines.find(m => m.id === i.mine_id)?.name || "Unknown Mine",
+      location: i.mine_location || mines.find(m => m.id === i.mine_id)?.location || "Unknown Area",
+    }));
+  }, [dbIncidents, mines]);
   
   const [searchQuery, setSearchQuery] = useState("");
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedIncident, setSelectedIncident] = useState<IncidentItem | null>(null);
+  const [selectedIncident, setSelectedIncident] = useState<any>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -94,7 +133,7 @@ export default function IncidentsPage() {
   const [incidentTime, setIncidentTime] = useState("");
   const [severity, setSeverity] = useState<any>("medium");
   const [description, setDescription] = useState("");
-  const [reportedBy, setReportedBy] = useState("Admin Kumar");
+  const [reportedBy, setReportedBy] = useState(session?.name || "Admin Kumar");
   const [immediateAction, setImmediateAction] = useState("");
   const [rootCause, setRootCause] = useState("");
   const [evidenceName, setEvidenceName] = useState("");
@@ -109,14 +148,19 @@ export default function IncidentsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setItems(incidentService.getIncidents());
-    setMines(complianceService.getMines());
-    
     setIncidentDate(new Date().toISOString().split("T")[0]);
     setIncidentTime(new Date().toTimeString().slice(0, 5));
-  }, []);
+    if (session?.name) {
+      setReportedBy(session.name);
+    }
+    if (session?.role === "MINE_MANAGER" && session?.mineId) {
+      setMineId(session.mineId);
+    }
+  }, [session]);
 
   const handleOpenModal = () => {
+    const targetMine = isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : (mineId || mines[0]?.id || "");
+    setMineId(targetMine);
     setIsModalOpen(true);
     setIncidentDate(new Date().toISOString().split("T")[0]);
     setIncidentTime(new Date().toTimeString().slice(0, 5));
@@ -126,7 +170,7 @@ export default function IncidentsPage() {
     setIsModalOpen(false);
     setTitle("");
     setIncidentType("Safety Incident");
-    setMineId("");
+    setMineId(isMineManager && session?.mineId ? session.mineId : "");
     setZoneName("");
     setDescription("");
     setSeverity("medium");
@@ -141,7 +185,8 @@ export default function IncidentsPage() {
   };
 
   const handleCaptureLocation = () => {
-    if (!mineId) {
+    const activeMine = (isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : mineId) || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b";
+    if (!activeMine) {
       toast.error("Please select a Mine first to capture GPS coordinates.");
       setErrors(prev => ({ ...prev, mineId: "Select mine before capturing location" }));
       return;
@@ -151,7 +196,7 @@ export default function IncidentsPage() {
       toast.error("Location services are not supported by this browser.");
       setGpsStatus("Browser geolocation unsupported. Fallback coordinates assigned.");
       // Fallback
-      const coords = inspectionService.getFallbackCoordinates(mineId);
+      const coords = inspectionService.getFallbackCoordinates(activeMine);
       setLatitude(coords.lat);
       setLongitude(coords.lng);
       setLocationSource("Fallback");
@@ -172,7 +217,7 @@ export default function IncidentsPage() {
       },
       (error) => {
         setGpsLoading(false);
-        const coords = inspectionService.getFallbackCoordinates(mineId);
+        const coords = inspectionService.getFallbackCoordinates(activeMine);
         setLatitude(coords.lat);
         setLongitude(coords.lng);
         setLocationSource("Fallback");
@@ -194,8 +239,10 @@ export default function IncidentsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const finalMineId = (isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : mineId) || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b";
+
     const newErrors: Record<string, string> = {};
-    if (!mineId) newErrors.mineId = "Mine selection is required";
+    if (!finalMineId) newErrors.mineId = "Mine selection is required";
     if (!zoneName) newErrors.zoneName = "Zone Location is required";
     if (!description.trim()) newErrors.description = "Incident description is required";
     if (!reportedBy.trim()) newErrors.reportedBy = "Reporter name is required";
@@ -212,39 +259,43 @@ export default function IncidentsPage() {
     let finalSource = locationSource;
 
     if (finalLat === undefined || finalLng === undefined) {
-      const coords = inspectionService.getFallbackCoordinates(mineId);
+      const coords = inspectionService.getFallbackCoordinates(finalMineId);
       finalLat = coords.lat;
       finalLng = coords.lng;
       finalSource = "Fallback";
     }
 
-    const mineObj = mines.find(m => m.id === mineId);
-    const mineName = mineObj ? mineObj.name : "Unknown Mine";
+    const mineObj = mines.find(m => m.id === finalMineId);
+    const mineName = mineObj ? mineObj.name : "Mine A";
 
-    const finalTitle = title.trim() || `${incidentType} at ${mineName}`;
-
-    incidentService.createIncident({
-      title: finalTitle,
-      type: incidentType,
-      mineId,
-      mineName,
-      zoneName,
-      incidentDate,
-      incidentTime: incidentTime || "12:00",
-      severity,
-      description,
-      reportedBy,
-      immediateAction: immediateAction || undefined,
-      rootCause: rootCause || undefined,
-      evidenceName: evidenceName || undefined,
-      latitude: finalLat,
-      longitude: finalLng,
-      locationSource: finalSource
-    });
-
-    setItems(incidentService.getIncidents());
-    toast.success("Incident logged successfully!");
-    handleCloseModal();
+    createIncident.mutate(
+      {
+        title: title.trim() || `${incidentType} Report`,
+        type: incidentType,
+        mineId: finalMineId,
+        zoneName: zoneName || undefined,
+        incidentDate,
+        incidentTime: incidentTime || "12:00",
+        severity,
+        description,
+        reportedBy,
+        immediateAction: immediateAction || undefined,
+        rootCause: rootCause || undefined,
+        evidenceUrl: evidenceName || undefined,
+        latitude: finalLat,
+        longitude: finalLng,
+        locationSource: finalSource,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Incident logged successfully!");
+          handleCloseModal();
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.error || "Failed to log incident");
+        },
+      }
+    );
   };
 
   const handleExport = () => {
@@ -294,30 +345,45 @@ export default function IncidentsPage() {
   };
 
   const handleResolveIncident = (id: string) => {
-    const parsed = localStorage.getItem("coalgov360_incidents") 
-      ? JSON.parse(localStorage.getItem("coalgov360_incidents")!) as IncidentItem[]
-      : [];
-      
-    const updated = parsed.map(item => {
-      if (item.id === id) {
-        return { ...item, status: "resolved" as const };
+    updateIncidentStatus.mutate(
+      { id, status: "resolved" },
+      {
+        onSuccess: () => toast.success("Incident status set to Resolved!"),
+        onError: (err: any) => toast.error(err?.response?.data?.error || "Failed to update incident"),
       }
-      return item;
-    });
-
-    localStorage.setItem("coalgov360_incidents", JSON.stringify(updated));
-    setItems(incidentService.getIncidents());
-    toast.success("Incident status set to Resolved!");
+    );
   };
 
   const filteredData = items.filter(item =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.mineName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.type.toLowerCase().includes(searchQuery.toLowerCase())
+    (item.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.mineName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.type || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const stats = incidentService.calculateStats(items);
-  const mineZonesList = mineId ? (mineZones[mineId] || defaultZones) : defaultZones;
+  const stats = useMemo(() => {
+    let active = 0;
+    let resolved = 0;
+    let high = 0;
+    items.forEach(item => {
+      if (item.status === "resolved" || item.status === "closed") {
+        resolved++;
+      } else {
+        active++;
+      }
+      if (item.severity === "high" || item.severity === "critical") {
+        high++;
+      }
+    });
+    return {
+      total: items.length,
+      active,
+      resolved,
+      high
+    };
+  }, [items]);
+
+  const selectedMine = mines.find(m => m.id === mineId);
+  const mineZonesList = selectedMine?.zones && selectedMine.zones.length > 0 ? selectedMine.zones : defaultZones;
 
   return (
     <>
@@ -331,16 +397,18 @@ export default function IncidentsPage() {
               Incident Management
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Track and manage safety incidents across all mines
+              {isMineManager ? "Track and manage safety incidents for your mine" : "Track and manage safety incidents across all mines"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              className="bg-yellow-600 hover:bg-yellow-700 text-white"
-              onClick={handleOpenModal}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Report Incident
-            </Button>
+            {canReport && (
+              <Button 
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                onClick={handleOpenModal}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Report Incident
+              </Button>
+            )}
             <Button variant="outline" onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
@@ -445,11 +513,12 @@ export default function IncidentsPage() {
                         >
                           View
                         </Button>
-                        {item.status !== "resolved" && item.status !== "closed" && (
+                        {canResolve && item.status !== "resolved" && item.status !== "closed" && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             className="h-8 text-green-600"
+                            title="Mark Incident Resolved"
                             onClick={() => handleResolveIncident(item.id)}
                           >
                             <CheckCircle2 className="h-4 w-4" />
@@ -504,25 +573,34 @@ export default function IncidentsPage() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <Label htmlFor="mine" className="text-sm font-medium">Mine Name *</Label>
-                <select
-                  id="mine"
-                  value={mineId}
-                  onChange={e => {
-                    setMineId(e.target.value);
-                    setZoneName("");
-                    if (errors.mineId) setErrors(prev => ({ ...prev, mineId: "" }));
-                  }}
-                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
-                >
-                  <option value="">Select Mine</option>
-                  {mines.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
-                {errors.mineId && <p className="text-xs text-red-600 font-medium">{errors.mineId}</p>}
-              </div>
+              {isMineManager ? (
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Mine</Label>
+                  <div className="h-9 flex items-center px-3 rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800/60 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {session.mineName || mines.find(m => m.id === session.mineId)?.name || "Assigned Mine"}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label htmlFor="mine" className="text-sm font-medium">Mine Name *</Label>
+                  <select
+                    id="mine"
+                    value={mineId}
+                    onChange={e => {
+                      setMineId(e.target.value);
+                      setZoneName("");
+                      if (errors.mineId) setErrors(prev => ({ ...prev, mineId: "" }));
+                    }}
+                    className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+                  >
+                    <option value="">Select Mine</option>
+                    {mines.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                  {errors.mineId && <p className="text-xs text-red-600 font-medium">{errors.mineId}</p>}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -785,8 +863,21 @@ export default function IncidentsPage() {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 mt-4">
             <Button variant="outline" onClick={() => setSelectedIncident(null)}>Close Details</Button>
+            {canResolve && selectedIncident && selectedIncident.status !== "resolved" && selectedIncident.status !== "closed" && (
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white text-xs gap-1.5"
+                onClick={() => {
+                  handleResolveIncident(selectedIncident.id);
+                  setSelectedIncident((prev: any) => ({ ...prev, status: "resolved" }));
+                }}
+              >
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Mark Incident Resolved
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

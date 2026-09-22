@@ -5,16 +5,33 @@ import axios from "axios";
 import type { ActivityRow, DashboardStats } from "@/types/database";
 import { useRealtimeSync } from "./useRealtimeSync";
 
+const defaultStats: DashboardStats = {
+  totalMines: 0,
+  complianceScore: 0,
+  openViolations: 0,
+  pendingInspections: 0,
+  activeWorkers: 0,
+  activeIncidentsCount: 0,
+};
+
 async function fetchActivities(mineId?: string, limit = 20): Promise<ActivityRow[]> {
-  const { data } = await axios.get("/api/activities", { params: { mineId, limit } });
-  return data.data ?? [];
+  try {
+    const validMineId = mineId && mineId !== "all" && mineId !== "null" ? mineId : undefined;
+    const { data } = await axios.get("/api/activities", {
+      params: { ...(validMineId ? { mineId: validMineId } : {}), limit },
+    });
+    return data?.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export function useActivities(mineId?: string, limit = 20) {
+  const validMineId = mineId && mineId !== "all" && mineId !== "null" ? mineId : undefined;
   useRealtimeSync("activities", ["activities"]);
   return useQuery({
-    queryKey: ["activities", mineId, limit],
-    queryFn: () => fetchActivities(mineId, limit),
+    queryKey: ["activities", validMineId ?? null, limit],
+    queryFn: () => fetchActivities(validMineId, limit),
     staleTime: 15 * 1000,
   });
 }
@@ -28,18 +45,26 @@ export function useMarkActivityRead() {
 }
 
 async function fetchDashboardStats(mineId?: string): Promise<DashboardStats> {
-  const { data } = await axios.get("/api/dashboard/stats", { params: { mineId } });
-  return data.data;
+  try {
+    const validMineId = mineId && mineId !== "all" && mineId !== "null" ? mineId : undefined;
+    const { data } = await axios.get("/api/dashboard/stats", {
+      params: validMineId ? { mineId: validMineId } : {},
+    });
+    return data?.data ?? defaultStats;
+  } catch {
+    return defaultStats;
+  }
 }
 
 export function useDashboardStats(mineId?: string) {
+  const validMineId = mineId && mineId !== "all" && mineId !== "null" ? mineId : undefined;
   useRealtimeSync("mines", ["dashboard-stats"]);
   useRealtimeSync("compliance_items", ["dashboard-stats"]);
   useRealtimeSync("incidents", ["dashboard-stats"]);
   useRealtimeSync("inspections", ["dashboard-stats"]);
 
   return useQuery({
-    queryKey: ["dashboard-stats", mineId],
-    queryFn: () => fetchDashboardStats(mineId),
+    queryKey: ["dashboard-stats", validMineId ?? null],
+    queryFn: () => fetchDashboardStats(validMineId),
   });
 }

@@ -139,3 +139,23 @@ export interface DashboardStats {
   activeWorkers: number;
   activeIncidentsCount: number;
 }
+
+export interface Employee {
+  id: string;
+  mine_id: string;
+  name: string;
+  designation: string;
+  phone: string;
+  emergency_name: string;
+  emergency_phone: string;
+  shift: string;
+  blood_group: string;
+  ppe_status: string;
+  training_status: string;
+  medical_checkup_date: string | null;
+  attendance: boolean;
+  created_at: string;
+  updated_at: string;
+  mine_name?: string;
+}
+

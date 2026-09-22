@@ -13,8 +13,12 @@ interface Filters {
 }
 
 async function fetchIncidents(filters: Filters): Promise<Incident[]> {
-  const { data } = await axios.get("/api/incidents", { params: filters });
-  return data.data;
+  try {
+    const { data } = await axios.get("/api/incidents", { params: filters });
+    return data?.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export function useIncidents(filters: Filters = {}) {
@@ -42,7 +46,11 @@ export function useCreateIncident() {
       longitude?: number;
       locationSource?: "GPS" | "Fallback";
     }) => axios.post("/api/incidents", payload).then((r) => r.data.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["incidents"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    },
   });
 }
 
@@ -51,6 +59,10 @@ export function useUpdateIncidentStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: IncidentStatus }) =>
       axios.patch(`/api/incidents/${id}`, { status }).then((r) => r.data.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["incidents"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    },
   });
 }

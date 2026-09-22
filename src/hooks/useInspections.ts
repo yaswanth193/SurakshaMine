@@ -12,8 +12,12 @@ interface Filters {
 }
 
 async function fetchInspections(filters: Filters): Promise<Inspection[]> {
-  const { data } = await axios.get("/api/inspections", { params: filters });
-  return data.data;
+  try {
+    const { data } = await axios.get("/api/inspections", { params: filters });
+    return data?.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export function useInspections(filters: Filters = {}) {
@@ -38,9 +42,14 @@ export function useCreateInspection() {
       latitude?: number;
       longitude?: number;
       locationSource?: "GPS" | "Fallback";
+      remarks?: string;
       status?: string;
     }) => axios.post("/api/inspections", payload).then((r) => r.data.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inspections"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inspections"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    },
   });
 }
 
@@ -49,6 +58,10 @@ export function useUpdateInspectionStatus() {
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: InspectionStatus }) =>
       axios.patch(`/api/inspections/${id}`, { status }).then((r) => r.data.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["inspections"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["inspections"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["activities"] });
+    },
   });
 }

@@ -26,14 +26,26 @@ import {
   Building,
   Info
 } from "lucide-react";
-import { insightService, type AIInsight } from "@/lib/insightService";
+import { insightService, generateLiveInsights, type AIInsight } from "@/lib/insightService";
 import { toast } from "sonner";
 import { useSession } from "@/hooks/useSession";
+import { useCompliance } from "@/hooks/useCompliance";
+import { useIncidents } from "@/hooks/useIncidents";
+import { useInspections } from "@/hooks/useInspections";
+import { useMines } from "@/hooks/useMines";
 
 export default function AIInsightsPage() {
   const router = useRouter();
   const { session } = useSession();
-  const [insights, setInsights] = useState<AIInsight[]>([]);
+  const isMineManager = session?.role === "MINE_MANAGER";
+  const managerMineId = isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : undefined;
+
+  const { data: compliance = [] } = useCompliance(managerMineId ? { mineId: managerMineId } : {});
+  const { data: incidents = [] } = useIncidents(managerMineId ? { mineId: managerMineId } : {});
+  const { data: inspections = [] } = useInspections(managerMineId ? { mineId: managerMineId } : {});
+  const { data: mines = [] } = useMines();
+
+  const [resolvedVersion, setResolvedVersion] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTypeTab, setSelectedTypeTab] = useState("all");
   const [selectedSeverity, setSelectedSeverity] = useState("all");
@@ -42,26 +54,30 @@ export default function AIInsightsPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   useEffect(() => {
-    setInsights(insightService.getInsights());
-  }, []);
-
-  useEffect(() => {
-    if (session?.role === "MINE_MANAGER") {
-      setSelectedMine(session.mineId || "M1");
+    if (session?.role === "MINE_MANAGER" && session?.mineId) {
+      setSelectedMine(session.mineId);
     }
   }, [session]);
+
+  const insights = useMemo(() => {
+    return generateLiveInsights({
+      compliance,
+      incidents,
+      inspections,
+      mines,
+      targetMineId: managerMineId,
+    });
+  }, [compliance, incidents, inspections, mines, managerMineId, resolvedVersion]);
 
   // Filter Logic
   const filteredInsights = useMemo(() => {
     return insights.filter(item => {
       if (item.status !== "active") return false;
 
-      // Mine restriction
-      let activeMine = selectedMine;
-      if (session?.role === "MINE_MANAGER") {
-        activeMine = session.mineId || "M1";
+      // Mine restriction for multi-mine roles only
+      if (!isMineManager && selectedMine !== "all" && item.mineId !== selectedMine) {
+        return false;
       }
-      if (activeMine !== "all" && item.mineId !== activeMine) return false;
 
       // Type Tab filter
       if (selectedTypeTab !== "all" && item.type !== selectedTypeTab) return false;
@@ -81,14 +97,14 @@ export default function AIInsightsPage() {
 
       return true;
     });
-  }, [insights, session, selectedTypeTab, selectedSeverity, selectedMine, searchQuery]);
+  }, [insights, isMineManager, session, selectedTypeTab, selectedSeverity, selectedMine, searchQuery]);
 
   // Derived Counts
   const counts = useMemo(() => {
     const active = insights.filter(item => {
       if (item.status !== "active") return false;
-      if (session?.role === "MINE_MANAGER") {
-        return item.mineId === (session.mineId || "M1");
+      if (isMineManager && session?.mineId) {
+        return item.mineId === session.mineId;
       }
       return true;
     });
@@ -101,11 +117,11 @@ export default function AIInsightsPage() {
     const avgConfidence = active.length > 0 ? Math.round(totalConfidence / active.length) : 0;
 
     return { alerts, predictions, anomalies, avgConfidence };
-  }, [insights, session]);
+  }, [insights, isMineManager, session]);
 
   const handleResolve = (id: string) => {
     insightService.resolveInsight(id);
-    setInsights(insightService.getInsights());
+    setResolvedVersion(v => v + 1);
     toast.success("AI Insight resolved successfully!");
   };
 
@@ -131,7 +147,9 @@ export default function AIInsightsPage() {
             </Badge>
           </div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            AI-powered governance, compliance and operational insights across mines.
+            {isMineManager 
+              ? `AI-powered predictive safety, compliance deadlines, and anomaly detection for ${session?.mineName || "your mine"}.`
+              : "AI-powered governance, compliance and operational insights across mines."}
           </p>
         </div>
 
@@ -248,7 +266,7 @@ export default function AIInsightsPage() {
                 </select>
               </div>
 
-              {session?.role !== "MINE_MANAGER" && (
+              {!isMineManager && (
                 <div className="flex items-center gap-2">
                   <Label htmlFor="mine-select" className="text-xs font-semibold uppercase text-gray-400 whitespace-nowrap">Mine</Label>
                   <select
@@ -258,12 +276,9 @@ export default function AIInsightsPage() {
                     className="h-9 rounded-4xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-3 py-1 text-sm outline-none"
                   >
                     <option value="all">All Mines</option>
-                    <option value="M1">Mine A</option>
-                    <option value="M2">Mine B</option>
-                    <option value="M3">Mine C</option>
-                    <option value="M4">Mine D</option>
-                    <option value="M5">Mine E</option>
-                    <option value="M6">Mine F</option>
+                    {mines.map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
                   </select>
                 </div>
               )}

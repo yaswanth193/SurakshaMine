@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,12 @@ import {
   Navigation,
 } from "lucide-react";
 import { toast } from "sonner";
-import { inspectionService, defaultZones, type InspectionItem } from "@/lib/inspectionService";
-import { complianceService, type Mine } from "@/lib/complianceService";
+import { useInspections, useCreateInspection, useUpdateInspectionStatus } from "@/hooks/useInspections";
+import { useMines } from "@/hooks/useMines";
+import { useSession } from "@/hooks/useSession";
+import { inspectionService, defaultZones } from "@/lib/inspectionService";
 import { downloadCSV } from "@/lib/exportUtils";
+import type { Inspection } from "@/types/database";
 
 const getStatusBadge = (status: string) => {
   const styles = {
@@ -53,15 +56,54 @@ const getSeverityBadge = (severity: string) => {
 };
 
 export default function InspectionsPage() {
-  const [items, setItems] = useState<InspectionItem[]>([]);
-  const [mines, setMines] = useState<Mine[]>([]);
-  const [inspectors, setInspectors] = useState<string[]>([]);
-  
+  const { session } = useSession();
+  const isMineManager = session?.role === "MINE_MANAGER";
+  const isInspector = session?.role === "INSPECTOR";
+  const canCreate = session?.role !== "CORPORATE_MANAGEMENT" && session?.role !== "REGULATORY_AUTHORITY";
+  const [inspectorScope, setInspectorScope] = useState<"all" | "mine">("all");
+  const managerMineId = isMineManager ? session?.mineId : undefined;
+  const { data: dbInspections = [], isLoading } = useInspections(
+    managerMineId ? { mineId: managerMineId } : {}
+  );
+  const { data: dbMines = [] } = useMines();
+  const createInspection = useCreateInspection();
+  const updateInspectionStatus = useUpdateInspectionStatus();
+
+  const mines = useMemo(() => {
+    return dbMines.map(m => ({
+      id: m.id,
+      name: m.name,
+      location: m.location,
+      zones: m.zones || [],
+    }));
+  }, [dbMines]);
+
+  const inspectors = ["Dr. Sharma", "Mr. Verma", "Ms. Patel", "Mr. Singh", "Er. Reddy", "Inspector Kumar"];
+
+  const items = useMemo(() => {
+    return dbInspections.map(i => ({
+      ...i,
+      mineId: i.mine_id,
+      mineName: i.mine_name || mines.find(m => m.id === i.mine_id)?.name || "Unknown Mine",
+      zoneName: i.zone_name || "",
+      inspectionType: i.inspection_type as any,
+      inspectorName: i.inspector_name,
+      inspectionDate: i.inspection_date,
+      inspectionTime: i.inspection_time,
+      evidenceName: i.evidence_url || undefined,
+      locationSource: (i.location_source || undefined) as "GPS" | "Fallback" | undefined,
+      date: i.inspection_date,
+      mine: i.mine_name || mines.find(m => m.id === i.mine_id)?.name || "Unknown Mine",
+      inspector: i.inspector_name,
+      location: i.mine_location || mines.find(m => m.id === i.mine_id)?.location || "Unknown Area",
+    }));
+  }, [dbInspections, mines]);
+
   const [searchQuery, setSearchQuery] = useState("");
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedInspection, setSelectedInspection] = useState<InspectionItem | null>(null);
+  const [selectedInspection, setSelectedInspection] = useState<any>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -86,14 +128,15 @@ export default function InspectionsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setItems(inspectionService.getInspections());
-    setMines(complianceService.getMines());
-    setInspectors(complianceService.getUsers());
-    
-    // Set default date/time on loading client
     setInspectionDate(new Date().toISOString().split("T")[0]);
     setInspectionTime(new Date().toTimeString().slice(0, 5));
-  }, []);
+    if (session?.name) {
+      setInspectorName(session.name);
+    }
+    if (session?.role === "MINE_MANAGER" && session?.mineId) {
+      setMineId(session.mineId);
+    }
+  }, [session]);
 
   const handleExport = () => {
     try {
@@ -136,18 +179,23 @@ export default function InspectionsPage() {
   };
 
   const handleOpenModal = () => {
+    const targetMine = isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : (mineId || mines[0]?.id || "");
+    setMineId(targetMine);
     setIsModalOpen(true);
     setInspectionDate(new Date().toISOString().split("T")[0]);
     setInspectionTime(new Date().toTimeString().slice(0, 5));
+    if (session?.role === "INSPECTOR" && session?.name) {
+      setInspectorName(session.name);
+    }
   };
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setTitle("");
-    setMineId("");
+    setMineId(isMineManager && session?.mineId ? session.mineId : "");
     setZoneName("");
     setInspectionType("Safety");
-    setInspectorName("");
+    setInspectorName(session?.name || "");
     setObservation("");
     setSeverity("medium");
     setRemarks("");
@@ -212,8 +260,10 @@ export default function InspectionsPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const finalMineId = (isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : mineId) || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b";
+
     const newErrors: Record<string, string> = {};
-    if (!mineId) newErrors.mineId = "Mine selection is required";
+    if (!finalMineId) newErrors.mineId = "Mine selection is required";
     if (!zoneName) newErrors.zoneName = "Zone Area selection is required";
     if (!inspectorName) newErrors.inspectorName = "Inspector selection is required";
     if (!inspectionDate) newErrors.inspectionDate = "Date is required";
@@ -230,49 +280,85 @@ export default function InspectionsPage() {
     let finalSource = locationSource;
 
     if (finalLat === undefined || finalLng === undefined) {
-      const coords = inspectionService.getFallbackCoordinates(mineId);
+      const coords = inspectionService.getFallbackCoordinates(finalMineId);
       finalLat = coords.lat;
       finalLng = coords.lng;
       finalSource = "Fallback";
     }
 
-    const mineObj = mines.find(m => m.id === mineId);
-    const mineName = mineObj ? mineObj.name : "Unknown Mine";
+    const mineObj = mines.find(m => m.id === finalMineId);
+    const mineName = mineObj ? mineObj.name : "Mine A";
 
     const finalTitle = title.trim() || `${inspectionType} Safety Inspection`;
 
-    inspectionService.createInspection({
-      title: finalTitle,
-      mineId,
-      mineName,
-      zoneName,
-      inspectionType,
-      inspectorName,
-      inspectionDate,
-      inspectionTime: inspectionTime || "12:00",
-      observation,
-      severity,
-      remarks: remarks || undefined,
-      evidenceName: evidenceName || undefined,
-      latitude: finalLat,
-      longitude: finalLng,
-      locationSource: finalSource
-    });
-
-    setItems(inspectionService.getInspections());
-    toast.success("Inspection checklist created successfully!");
-    handleCloseModal();
+    createInspection.mutate(
+      {
+        title: finalTitle,
+        mineId: finalMineId,
+        zoneName: zoneName || undefined,
+        inspectionType,
+        inspectorName,
+        inspectionDate,
+        inspectionTime: inspectionTime || "12:00",
+        observation,
+        severity,
+        remarks: remarks || undefined,
+        evidenceUrl: evidenceName || undefined,
+        latitude: finalLat,
+        longitude: finalLng,
+        locationSource: finalSource,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Inspection checklist created successfully!");
+          handleCloseModal();
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.error || "Failed to create inspection");
+        },
+      }
+    );
   };
 
-  const filteredData = items.filter(item =>
-    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.mineName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.inspectorName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.inspectionType.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredData = items.filter(item => {
+    if (isInspector && inspectorScope === "mine" && session?.name) {
+      if (!item.inspectorName?.toLowerCase().includes(session.name.toLowerCase())) {
+        return false;
+      }
+    }
+    return (
+      (item.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.mineName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.inspectorName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.inspectionType || "").toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
-  const stats = inspectionService.calculateStats(items);
-  const mineZonesList = mineId ? inspectionService.getZonesForMine(mineId) : defaultZones;
+  const stats = useMemo(() => {
+    let scheduled = 0;
+    let inProgress = 0;
+    let completed = 0;
+    items.forEach(item => {
+      if (item.status === "scheduled") {
+        scheduled++;
+      } else if (item.status === "in-progress") {
+        inProgress++;
+      } else if (item.status === "completed" || item.status === "closed") {
+        completed++;
+      } else {
+        inProgress++;
+      }
+    });
+    return {
+      total: items.length,
+      scheduled,
+      inProgress,
+      completed,
+    };
+  }, [items]);
+
+  const selectedMine = mines.find(m => m.id === mineId);
+  const mineZonesList = selectedMine?.zones && selectedMine.zones.length > 0 ? selectedMine.zones : defaultZones;
 
   return (
     <>
@@ -286,16 +372,18 @@ export default function InspectionsPage() {
               Inspections Management
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Schedule and track mine inspections
+              {isMineManager ? "Schedule and track inspections for your mine" : "Schedule and track mine inspections"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              className="bg-yellow-600 hover:bg-yellow-700 text-white"
-              onClick={handleOpenModal}
-            >
-              <Plus className="mr-2 h-4 w-4" /> New Inspection
-            </Button>
+            {canCreate && (
+              <Button 
+                className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                onClick={handleOpenModal}
+              >
+                <Plus className="mr-2 h-4 w-4" /> New Inspection
+              </Button>
+            )}
             <Button variant="outline" onClick={handleExport}>
               <Download className="mr-2 h-4 w-4" /> Export
             </Button>
@@ -330,16 +418,44 @@ export default function InspectionsPage() {
           </Card>
         </div>
 
-        {/* Search */}
+        {/* Search & Scope */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <Input
-              placeholder="Search inspections by inspector, mine, type..."
-              className="pl-9"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+          <div className="flex items-center gap-2 flex-1 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                placeholder="Search inspections by inspector, mine, type..."
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            {isInspector && (
+              <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-xs shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setInspectorScope("all")}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${
+                    inspectorScope === "all"
+                      ? "bg-white dark:bg-gray-700 font-semibold text-yellow-700 dark:text-yellow-400 shadow-xs"
+                      : "text-gray-500"
+                  }`}
+                >
+                  All Audits
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setInspectorScope("mine")}
+                  className={`px-2.5 py-1 rounded-md transition-colors ${
+                    inspectorScope === "mine"
+                      ? "bg-white dark:bg-gray-700 font-semibold text-yellow-700 dark:text-yellow-400 shadow-xs"
+                      : "text-gray-500"
+                  }`}
+                >
+                  My Audits
+                </button>
+              </div>
+            )}
           </div>
           <Button variant="outline" size="sm">
             <Filter className="h-4 w-4 mr-2" /> Filter
@@ -398,9 +514,60 @@ export default function InspectionsPage() {
                     >
                       View Details
                     </Button>
-                    <Button size="sm" className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white" onClick={() => toast.info(`Starting audit context for ${item.id}`)}>
-                      Start
-                    </Button>
+                    {canCreate ? (
+                      item.status === "scheduled" || item.status === "pending" ? (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
+                          onClick={() => {
+                            updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
+                            toast.success(`Started inspection ${item.id} — marked In-Progress`);
+                          }}
+                        >
+                          Start
+                        </Button>
+                      ) : item.status === "in-progress" ? (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                          onClick={() => {
+                            updateInspectionStatus.mutate({ id: item.id, status: "completed" });
+                            toast.success(`Completed inspection ${item.id}`);
+                          }}
+                        >
+                          Complete
+                        </Button>
+                      ) : item.status === "requires-action" ? (
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                          onClick={() => {
+                            updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
+                            toast.info(`Re-opened inspection ${item.id} for audit remediation`);
+                          }}
+                        >
+                          Review
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled
+                          className="flex-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
+                        >
+                          Done ✓
+                        </Button>
+                      )
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setSelectedInspection(item)}
+                      >
+                        Inspect
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -431,25 +598,34 @@ export default function InspectionsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label htmlFor="mine" className="text-sm font-medium">Mine *</Label>
-                <select
-                  id="mine"
-                  value={mineId}
-                  onChange={e => {
-                    setMineId(e.target.value);
-                    setZoneName(""); // Reset zone when mine changes
-                    if (errors.mineId) setErrors(prev => ({ ...prev, mineId: "" }));
-                  }}
-                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm transition-colors outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
-                >
-                  <option value="">Select Mine</option>
-                  {mines.map(m => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
-                  ))}
-                </select>
-                {errors.mineId && <p className="text-xs text-red-600 font-medium">{errors.mineId}</p>}
-              </div>
+              {isMineManager ? (
+                <div className="space-y-1">
+                  <Label className="text-sm font-medium">Mine</Label>
+                  <div className="h-9 flex items-center px-3 rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800/60 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {session.mineName || mines.find(m => m.id === session.mineId)?.name || "Assigned Mine"}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  <Label htmlFor="mine" className="text-sm font-medium">Mine *</Label>
+                  <select
+                    id="mine"
+                    value={mineId}
+                    onChange={e => {
+                      setMineId(e.target.value);
+                      setZoneName(""); // Reset zone when mine changes
+                      if (errors.mineId) setErrors(prev => ({ ...prev, mineId: "" }));
+                    }}
+                    className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm transition-colors outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+                  >
+                    <option value="">Select Mine</option>
+                    {mines.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                  {errors.mineId && <p className="text-xs text-red-600 font-medium">{errors.mineId}</p>}
+                </div>
+              )}
 
               <div className="space-y-1">
                 <Label htmlFor="zone" className="text-sm font-medium">Zone / Operational Area *</Label>
@@ -713,8 +889,52 @@ export default function InspectionsPage() {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 mt-4">
             <Button variant="outline" onClick={() => setSelectedInspection(null)}>Close Details</Button>
+            {canCreate && selectedInspection && (
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedInspection.status !== "in-progress" && selectedInspection.status !== "completed" && (
+                  <Button
+                    size="sm"
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white text-xs"
+                    onClick={() => {
+                      updateInspectionStatus.mutate({ id: selectedInspection.id, status: "in-progress" });
+                      setSelectedInspection((prev: any) => ({ ...prev, status: "in-progress" }));
+                      toast.success("Inspection marked In-Progress");
+                    }}
+                  >
+                    Mark In-Progress
+                  </Button>
+                )}
+                {selectedInspection.status !== "completed" && (
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                    onClick={() => {
+                      updateInspectionStatus.mutate({ id: selectedInspection.id, status: "completed" });
+                      setSelectedInspection((prev: any) => ({ ...prev, status: "completed" }));
+                      toast.success("Inspection marked Completed");
+                    }}
+                  >
+                    Mark Completed
+                  </Button>
+                )}
+                {selectedInspection.status !== "requires-action" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 text-red-600 hover:bg-red-50 text-xs"
+                    onClick={() => {
+                      updateInspectionStatus.mutate({ id: selectedInspection.id, status: "requires-action" });
+                      setSelectedInspection((prev: any) => ({ ...prev, status: "requires-action" }));
+                      toast.warning("Flagged as Requires Remedial Action");
+                    }}
+                  >
+                    Flag Action Required
+                  </Button>
+                )}
+              </div>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

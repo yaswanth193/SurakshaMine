@@ -18,13 +18,13 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/gis",
+    "/employees",
     "/reports",
     "/users",
     "/settings",
     "/profile",
     "/ai-insights",
     "/api/push"
-    
   ],
   CORPORATE_MANAGEMENT: [
     "/dashboard",
@@ -32,6 +32,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/gis",
+    "/employees",
     "/reports",
     "/profile",
     "/settings",
@@ -44,14 +45,15 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/gis",
+    "/employees",
     "/reports",
     "/profile",
     "/settings",
     "/ai-insights",
-    "/employees",
     "/api/push"
   ],
   INSPECTOR: [
+    "/dashboard",
     "/inspections",
     "/incidents",
     "/gis",
@@ -65,6 +67,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/gis",
+    "/employees",
     "/reports",
     "/profile",
     "/settings",
