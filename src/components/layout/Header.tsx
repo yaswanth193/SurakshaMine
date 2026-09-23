@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import Link from "next/link";
@@ -41,6 +41,7 @@ import {
   Calendar,
   Scale,
   BarChart3,
+  MoreHorizontal,
   Menu,
 } from "lucide-react";
 import {
@@ -107,6 +108,29 @@ export function Header() {
     ? navItems.filter((item) => isRouteAllowed(session.role, item.href))
     : [];
 
+  // Responsive desktop navigation:
+  // If role has > 6 items, show 5 primary items + "More ▾" dropdown to guarantee zero overflow.
+  // If active page is in overflow, dynamically promote it to visible slots so it is always highlighted!
+  const { visibleNavItems, overflowNavItems, isOverflowActive } = useMemo(() => {
+    if (allowedNavItems.length <= 6) {
+      return { visibleNavItems: allowedNavItems, overflowNavItems: [], isOverflowActive: false };
+    }
+
+    const activeIdx = allowedNavItems.findIndex((item) => pathname === item.href);
+    if (activeIdx >= 5) {
+      const activeItem = allowedNavItems[activeIdx];
+      const direct = [...allowedNavItems.slice(0, 4), activeItem];
+      const overflow = allowedNavItems.filter((_, idx) => idx !== activeIdx && idx >= 4);
+      return { visibleNavItems: direct, overflowNavItems: overflow, isOverflowActive: true };
+    }
+
+    return {
+      visibleNavItems: allowedNavItems.slice(0, 5),
+      overflowNavItems: allowedNavItems.slice(5),
+      isOverflowActive: false,
+    };
+  }, [allowedNavItems, pathname]);
+
   const handleNavigation = (href: string) => {
     setMobileMenuOpen(false);
     router.push(href);
@@ -151,7 +175,7 @@ export function Header() {
       <header className="sticky top-0 z-50 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60 dark:bg-gray-950/95 border-gray-200 dark:border-gray-800">
         <div className="flex h-16 items-center justify-between px-4 sm:px-6 w-full">
           {/* Left Brand & Desktop Navigation (clean linear flow, no overlap) */}
-          <div className="flex items-center gap-3 lg:gap-6 flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 lg:gap-4 flex-1 min-w-0">
             {/* Mobile Hamburger Trigger for phones & tablets (< lg) */}
             <div className="flex items-center lg:hidden shrink-0">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -272,9 +296,9 @@ export function Header() {
               </span>
             </Link>
 
-            {/* Desktop Navigation - laptop responsive from 1024px to 1920px */}
-            <nav className="hidden lg:flex items-center gap-1 xl:gap-2 shrink-0">
-              {allowedNavItems.map((item) => {
+            {/* Desktop Navigation - zero-overlap responsive navigation */}
+            <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 min-w-0">
+              {visibleNavItems.map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
                 return (
@@ -282,23 +306,71 @@ export function Header() {
                     key={item.href}
                     variant="ghost"
                     size="sm"
-                    className={`h-9 px-2 xl:px-3 text-sm font-medium gap-1.5 xl:gap-2 shrink-0 whitespace-nowrap transition-colors ${
+                    className={`h-8 px-2 xl:px-2.5 text-xs xl:text-sm font-medium gap-1.5 shrink-0 whitespace-nowrap transition-colors ${
                       isActive
                         ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400 font-semibold shadow-2xs"
                         : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-800/60"
                     }`}
                     onClick={() => handleNavigation(item.href)}
                   >
-                    <Icon className="h-4 w-4 shrink-0" />
+                    <Icon className="h-3.5 w-3.5 xl:h-4 xl:w-4 shrink-0" />
                     <span>{item.label}</span>
                   </Button>
                 );
               })}
+
+              {/* Overflow "More ▾" menu when role has more than 6 navigation options */}
+              {overflowNavItems.length > 0 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`h-8 px-2 xl:px-2.5 text-xs xl:text-sm font-medium gap-1 shrink-0 whitespace-nowrap transition-colors ${
+                        isOverflowActive
+                          ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400 font-semibold shadow-2xs"
+                          : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-800/60"
+                      }`}
+                    >
+                      <MoreHorizontal className="h-3.5 w-3.5 xl:h-4 xl:w-4 shrink-0" />
+                      <span>More</span>
+                      <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-52" align="start">
+                    <DropdownMenuLabel className="text-xs text-gray-500 font-normal">
+                      Additional Modules
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {overflowNavItems.map((item) => {
+                      const isActive = pathname === item.href;
+                      const Icon = item.icon;
+                      return (
+                        <DropdownMenuItem
+                          key={item.href}
+                          onClick={() => handleNavigation(item.href)}
+                          className={`flex items-center gap-2.5 cursor-pointer text-xs ${
+                            isActive
+                              ? "bg-yellow-50 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-400 font-semibold"
+                              : "text-gray-700 dark:text-gray-200"
+                          }`}
+                        >
+                          <Icon className={`h-4 w-4 ${isActive ? "text-yellow-600 dark:text-yellow-400" : "text-gray-400"}`} />
+                          <span>{item.label}</span>
+                          {isActive && (
+                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-yellow-600 dark:bg-yellow-400" />
+                          )}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </nav>
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-3">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0 ml-auto pl-2">
 
             {/* Notification Bell Dropdown */}
             <DropdownMenu>
@@ -502,11 +574,11 @@ export function Header() {
                       {mounted && session ? session.name.split(" ").map(n => n[0]).join("") : "..."}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium leading-none">{mounted && session ? session.name : "User"}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{mounted && session ? getRoleDisplayName(session.role) : "Portal User"}</p>
+                  <div className="hidden xl:block text-left">
+                    <p className="text-sm font-medium leading-none truncate max-w-[120px]">{mounted && session ? session.name : "User"}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{mounted && session ? getRoleDisplayName(session.role) : "Portal User"}</p>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                  <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="end">
