@@ -479,66 +479,68 @@ export default function InspectionsPage() {
                     </div>
                   </div>
                   <div className="mt-4 flex gap-2 border-t pt-3">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => setSelectedInspection(item)}
-                    >
-                      View Details
-                    </Button>
                     {canCreate ? (
-                      item.status === "scheduled" || item.status === "pending" ? (
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
-                          onClick={() => {
-                            updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
-                            toast.success(`Started inspection ${item.id} — marked In-Progress`);
-                          }}
+                      <>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="flex-1"
+                          onClick={() => setSelectedInspection(item)}
                         >
-                          Start
+                          View Details
                         </Button>
-                      ) : item.status === "in-progress" ? (
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                          onClick={() => {
-                            updateInspectionStatus.mutate({ id: item.id, status: "completed" });
-                            toast.success(`Completed inspection ${item.id}`);
-                          }}
-                        >
-                          Complete
-                        </Button>
-                      ) : item.status === "requires-action" ? (
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                          onClick={() => {
-                            updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
-                            toast.info(`Re-opened inspection ${item.id} for audit remediation`);
-                          }}
-                        >
-                          Review
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled
-                          className="flex-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
-                        >
-                          Done ✓
-                        </Button>
-                      )
+                        {item.status === "scheduled" || item.status === "pending" ? (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
+                            onClick={() => {
+                              updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
+                              toast.success(`Started inspection ${item.id} — marked In-Progress`);
+                            }}
+                          >
+                            Start
+                          </Button>
+                        ) : item.status === "in-progress" ? (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => {
+                              updateInspectionStatus.mutate({ id: item.id, status: "completed" });
+                              toast.success(`Completed inspection ${item.id}`);
+                            }}
+                          >
+                            Complete
+                          </Button>
+                        ) : item.status === "requires-action" ? (
+                          <Button
+                            size="sm"
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                            onClick={() => {
+                              updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
+                              toast.info(`Re-opened inspection ${item.id} for audit remediation`);
+                            }}
+                          >
+                            Review
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled
+                            className="flex-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800"
+                          >
+                            Done ✓
+                          </Button>
+                        )}
+                      </>
                     ) : (
                       <Button
                         size="sm"
                         variant="outline"
-                        className="flex-1"
+                        className="w-full"
                         onClick={() => setSelectedInspection(item)}
                       >
-                        Inspect
+                        View Details
                       </Button>
                     )}
                   </div>

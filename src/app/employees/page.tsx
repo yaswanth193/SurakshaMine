@@ -120,7 +120,8 @@ export default function EmployeesPage() {
 
   const isMineManager = session?.role === "MINE_MANAGER";
   const isAdmin = session?.role === "ADMIN";
-  const canManage = isAdmin || isMineManager;
+  const isCorporate = session?.role === "CORPORATE_MANAGEMENT";
+  const canManage = isAdmin || isMineManager || isCorporate;
   const managerMineId = isMineManager ? (session?.mineId || "47d2d435-8bae-49ca-b8d2-b6e71b407e9b") : undefined;
 
   const filterParams = useMemo(() => {
@@ -203,7 +204,9 @@ export default function EmployeesPage() {
     return dbEmployees.map((e: DbEmployee) => {
       const isAttending = attendanceOverrides[e.id] !== undefined
         ? attendanceOverrides[e.id]
-        : (e.attendance !== undefined ? e.attendance : true);
+        : (attendanceOverrides[e.name] !== undefined
+            ? attendanceOverrides[e.name]
+            : (e.attendance !== undefined ? e.attendance : true));
       return {
         id: e.id,
         name: e.name,
@@ -236,8 +239,13 @@ export default function EmployeesPage() {
 
   const toggleAttendance = (id: string, currentStatus: boolean) => {
     const newStatus = !currentStatus;
+    const targetEmp = employees.find((e) => e.id === id);
+
     setAttendanceOverrides((prev) => {
       const next = { ...prev, [id]: newStatus };
+      if (targetEmp?.name) {
+        next[targetEmp.name] = newStatus;
+      }
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem("suraksha_attendance_overrides", JSON.stringify(next));
@@ -248,7 +256,6 @@ export default function EmployeesPage() {
       return next;
     });
 
-    const targetEmp = employees.find((e) => e.id === id);
     toast.success(`${targetEmp?.name || "Employee"} marked as ${newStatus ? "Present" : "Absent"}`);
 
     updateEmployeeMutation.mutate({
@@ -725,29 +732,20 @@ export default function EmployeesPage() {
                       <td className="text-sm">{emp.shift}</td>
 
                       <td>
-                        {canManage ? (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleAttendance(emp.id, emp.attendance);
-                            }}
-                            className={`px-3 py-1 rounded text-xs font-semibold text-white transition-all shadow-xs cursor-pointer hover:opacity-90 active:scale-95 ${
-                              emp.attendance ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
-                            }`}
-                            title={`Click to mark as ${emp.attendance ? "Absent" : "Present"}`}
-                          >
-                            {emp.attendance ? "Present" : "Absent"}
-                          </button>
-                        ) : (
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-xs font-medium text-white ${
-                              emp.attendance ? "bg-green-600" : "bg-gray-400"
-                            }`}
-                          >
-                            {emp.attendance ? "Present" : "Absent"}
-                          </span>
-                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAttendance(emp.id, emp.attendance);
+                          }}
+                          className={`px-3 py-1 rounded text-xs font-semibold text-white transition-all shadow-xs cursor-pointer hover:opacity-90 active:scale-95 flex items-center gap-1.5 ${
+                            emp.attendance ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
+                          }`}
+                          title={`Click to mark as ${emp.attendance ? "Absent" : "Present"}`}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-white" />
+                          {emp.attendance ? "Present" : "Absent"}
+                        </button>
                       </td>
 
                       <td className="text-right">

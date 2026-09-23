@@ -40,8 +40,8 @@ import {
   ExternalLink,
   Calendar,
   Scale,
-  MoreHorizontal,
   Menu,
+  BarChart3,
 } from "lucide-react";
 import {
   Sheet,
@@ -63,6 +63,7 @@ const navItems = [
   { href: "/incidents", label: "Incidents", icon: AlertTriangle },
   { href: "/gis", label: "GIS Map", icon: Layers },
   { href: "/regulations", label: "Regulations", icon: Scale },
+  { href: "/analysis", label: "Analysis", icon: BarChart3 },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/ai-insights", label: "AI Insights", icon: BrainCircuit },
 ];
@@ -105,29 +106,6 @@ export function Header() {
   const allowedNavItems = mounted && session
     ? navItems.filter((item) => isRouteAllowed(session.role, item.href))
     : [];
-
-  // Responsive desktop navigation:
-  // If role has > 6 items, show 5 primary items + "More ▾" dropdown to guarantee zero overflow.
-  // If active page is in overflow, dynamically promote it to visible slots so it is always highlighted!
-  const { visibleNavItems, overflowNavItems, isOverflowActive } = useMemo(() => {
-    if (allowedNavItems.length <= 6) {
-      return { visibleNavItems: allowedNavItems, overflowNavItems: [], isOverflowActive: false };
-    }
-
-    const activeIdx = allowedNavItems.findIndex((item) => pathname === item.href);
-    if (activeIdx >= 5) {
-      const activeItem = allowedNavItems[activeIdx];
-      const direct = [...allowedNavItems.slice(0, 4), activeItem];
-      const overflow = allowedNavItems.filter((_, idx) => idx !== activeIdx && idx >= 4);
-      return { visibleNavItems: direct, overflowNavItems: overflow, isOverflowActive: true };
-    }
-
-    return {
-      visibleNavItems: allowedNavItems.slice(0, 5),
-      overflowNavItems: allowedNavItems.slice(5),
-      isOverflowActive: false,
-    };
-  }, [allowedNavItems, pathname]);
 
   const handleNavigation = (href: string) => {
     setMobileMenuOpen(false);
@@ -294,9 +272,9 @@ export function Header() {
               </span>
             </Link>
 
-            {/* Desktop Navigation - zero-overlap responsive navigation */}
+            {/* Desktop Navigation - all feature names shown directly in header */}
             <nav className="hidden lg:flex items-center gap-1 xl:gap-1.5 min-w-0">
-              {visibleNavItems.map((item) => {
+              {allowedNavItems.map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
                 return (
@@ -316,54 +294,6 @@ export function Header() {
                   </Button>
                 );
               })}
-
-              {/* Overflow "More ▾" menu when role has more than 6 navigation options */}
-              {overflowNavItems.length > 0 && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className={`h-8 px-2 xl:px-2.5 text-xs xl:text-sm font-medium gap-1 shrink-0 whitespace-nowrap transition-colors ${
-                        isOverflowActive
-                          ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400 font-semibold shadow-2xs"
-                          : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-800/60"
-                      }`}
-                    >
-                      <MoreHorizontal className="h-3.5 w-3.5 xl:h-4 xl:w-4 shrink-0" />
-                      <span>More</span>
-                      <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-52" align="start">
-                    <DropdownMenuLabel className="text-xs text-gray-500 font-normal">
-                      Additional Modules
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    {overflowNavItems.map((item) => {
-                      const isActive = pathname === item.href;
-                      const Icon = item.icon;
-                      return (
-                        <DropdownMenuItem
-                          key={item.href}
-                          onClick={() => handleNavigation(item.href)}
-                          className={`flex items-center gap-2.5 cursor-pointer text-xs ${
-                            isActive
-                              ? "bg-yellow-50 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-400 font-semibold"
-                              : "text-gray-700 dark:text-gray-200"
-                          }`}
-                        >
-                          <Icon className={`h-4 w-4 ${isActive ? "text-yellow-600 dark:text-yellow-400" : "text-gray-400"}`} />
-                          <span>{item.label}</span>
-                          {isActive && (
-                            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-yellow-600 dark:bg-yellow-400" />
-                          )}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
             </nav>
           </div>
 

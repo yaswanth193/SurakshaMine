@@ -67,6 +67,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/regulations",
+    "/analysis",
     "/reports",
     "/profile",
     "/settings"
