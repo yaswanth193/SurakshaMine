@@ -150,8 +150,8 @@ export function Header() {
         <div className="flex h-16 items-center justify-between px-4 sm:px-6 w-full">
           {/* Left Brand & Desktop Navigation (clean linear flow, no overlap) */}
           <div className="flex items-center gap-3 lg:gap-6 flex-1 min-w-0">
-            {/* Mobile Hamburger Trigger for phones & tablets (< xl) */}
-            <div className="flex items-center xl:hidden shrink-0">
+            {/* Mobile Hamburger Trigger for phones & tablets (< lg) */}
+            <div className="flex items-center lg:hidden shrink-0">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-9 w-9 text-gray-700 dark:text-gray-200">
@@ -270,8 +270,8 @@ export function Header() {
               </span>
             </Link>
 
-            {/* Desktop Navigation - normal, clear, visible sizing */}
-            <nav className="hidden xl:flex items-center gap-1.5 shrink-0">
+            {/* Desktop Navigation - laptop responsive from 1024px to 1920px */}
+            <nav className="hidden lg:flex items-center gap-1 xl:gap-2 shrink-0">
               {allowedNavItems.map((item) => {
                 const isActive = pathname === item.href;
                 const Icon = item.icon;
@@ -280,7 +280,7 @@ export function Header() {
                     key={item.href}
                     variant="ghost"
                     size="sm"
-                    className={`h-9 px-3 text-sm font-medium gap-2 shrink-0 whitespace-nowrap transition-colors ${
+                    className={`h-9 px-2 xl:px-3 text-sm font-medium gap-1.5 xl:gap-2 shrink-0 whitespace-nowrap transition-colors ${
                       isActive
                         ? "bg-yellow-50 text-yellow-700 dark:bg-yellow-950/40 dark:text-yellow-400 font-semibold shadow-2xs"
                         : "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 hover:bg-gray-100/80 dark:hover:bg-gray-800/60"
