@@ -33,16 +33,21 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { signIn } = useSession();
-  const [email, setEmail] = useState("admin@coalgov.in");
-  const [password, setPassword] = useState("password");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleRoleSelect = (roleVal: string) => {
+    setSelectedRole(roleVal);
     const matched = demoLogins.find((u) => u.role === roleVal);
     if (matched) {
       setEmail(matched.email);
       setPassword("password");
+    } else {
+      setEmail("");
+      setPassword("");
     }
   };
 
@@ -93,17 +98,19 @@ function LoginForm() {
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="role-select">Select Demo Role</Label>
+                <Label htmlFor="role-select">Quick Demo Login (Optional)</Label>
                 <select
                   id="role-select"
+                  value={selectedRole}
                   onChange={(e) => handleRoleSelect(e.target.value)}
                   className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
                 >
-                  <option value="ADMIN">Admin </option>
-                  <option value="CORPORATE_MANAGEMENT">Corporate Management </option>
-                  <option value="MINE_MANAGER">Mine Manager </option>
-                  <option value="INSPECTOR">Inspection</option>
-                  <option value="REGULATORY_AUTHORITY">Regulatory Authority </option>
+                  <option value="">-- Enter credentials manually or pick demo role --</option>
+                  <option value="ADMIN">Admin (admin@coalgov.in)</option>
+                  <option value="CORPORATE_MANAGEMENT">Corporate Management (corporate@coalgov.in)</option>
+                  <option value="MINE_MANAGER">Mine Manager (manager@coalgov.in)</option>
+                  <option value="INSPECTOR">Inspector (inspector@coalgov.in)</option>
+                  <option value="REGULATORY_AUTHORITY">Regulatory Authority (authority@coalgov.in)</option>
                 </select>
               </div>
 
@@ -112,10 +119,11 @@ function LoginForm() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="admin@coalgov.in"
+                  placeholder="Enter your email (e.g. user@surakshamine.gov.in)"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="username"
                 />
               </div>
 
@@ -125,10 +133,11 @@ function LoginForm() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
+                    placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                   />
                   <Button
                     type="button"

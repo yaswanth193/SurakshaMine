@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -131,7 +132,16 @@ const stateCoords: Record<string, { lat: number; lng: number }> = {
 };
 
 export default function GISPage() {
+  const router = useRouter();
   const { session } = useSession();
+
+  // Regulatory Authority does not have GIS access; redirect to regulations
+  useEffect(() => {
+    if (session?.role === "REGULATORY_AUTHORITY") {
+      router.replace("/regulations");
+    }
+  }, [session, router]);
+
   const isMineManager = session?.role === "MINE_MANAGER";
   const canUploadPhotos = session?.role === "MINE_MANAGER" || session?.role === "ADMIN" || session?.role === "INSPECTOR";
   const { data: dbMines = [], isLoading, refetch } = useMines();
