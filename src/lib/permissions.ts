@@ -20,6 +20,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/gis",
     "/employees",
     "/regulations",
+    "/analysis",
     "/reports",
     "/users",
     "/settings",
@@ -59,8 +60,7 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/incidents",
     "/gis",
     "/profile",
-    "/settings",
-    "/ai-insights"
+    "/settings"
   ],
   REGULATORY_AUTHORITY: [
     "/dashboard",
@@ -68,11 +68,10 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/regulations",
-    "/employees",
+    "/analysis",
     "/reports",
     "/profile",
-    "/settings",
-    "/ai-insights"
+    "/settings"
   ]
 };
 

@@ -59,8 +59,7 @@ export default function InspectionsPage() {
   const { session } = useSession();
   const isMineManager = session?.role === "MINE_MANAGER";
   const isInspector = session?.role === "INSPECTOR";
-  const canCreate = session?.role !== "CORPORATE_MANAGEMENT" && session?.role !== "REGULATORY_AUTHORITY";
-  const [inspectorScope, setInspectorScope] = useState<"all" | "mine">("all");
+  const canCreate = session?.role === "ADMIN" || session?.role === "MINE_MANAGER";
   const managerMineId = isMineManager ? session?.mineId : undefined;
   const { data: dbInspections = [], isLoading } = useInspections(
     managerMineId ? { mineId: managerMineId } : {}
@@ -321,7 +320,7 @@ export default function InspectionsPage() {
   };
 
   const filteredData = items.filter(item => {
-    if (isInspector && inspectorScope === "mine" && session?.name) {
+    if (isInspector && session?.name) {
       if (!item.inspectorName?.toLowerCase().includes(session.name.toLowerCase())) {
         return false;
       }
@@ -430,32 +429,6 @@ export default function InspectionsPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            {isInspector && (
-              <div className="flex items-center p-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-xs shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setInspectorScope("all")}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    inspectorScope === "all"
-                      ? "bg-white dark:bg-gray-700 font-semibold text-yellow-700 dark:text-yellow-400 shadow-xs"
-                      : "text-gray-500"
-                  }`}
-                >
-                  All Audits
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setInspectorScope("mine")}
-                  className={`px-2.5 py-1 rounded-md transition-colors ${
-                    inspectorScope === "mine"
-                      ? "bg-white dark:bg-gray-700 font-semibold text-yellow-700 dark:text-yellow-400 shadow-xs"
-                      : "text-gray-500"
-                  }`}
-                >
-                  My Audits
-                </button>
-              </div>
-            )}
           </div>
           <Button variant="outline" size="sm">
             <Filter className="h-4 w-4 mr-2" /> Filter

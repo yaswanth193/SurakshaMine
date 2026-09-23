@@ -54,10 +54,19 @@ export default function AIInsightsPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   useEffect(() => {
+    if (
+      session &&
+      session.role !== "ADMIN" &&
+      session.role !== "CORPORATE_MANAGEMENT" &&
+      session.role !== "MINE_MANAGER"
+    ) {
+      router.replace("/dashboard");
+      return;
+    }
     if (session?.role === "MINE_MANAGER" && session?.mineId) {
       setSelectedMine(session.mineId);
     }
-  }, [session]);
+  }, [session, router]);
 
   const insights = useMemo(() => {
     return generateLiveInsights({
@@ -309,25 +318,25 @@ export default function AIInsightsPage() {
                 </CardHeader>
                 
                 <CardContent className="py-4 flex-1">
-                  <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed mb-4">
-                    {insight.description}
-                  </p>
-
-                  <div className="space-y-2 mb-4 bg-gray-50 dark:bg-gray-950 p-3 rounded-xl border dark:border-gray-800/40">
-                    <p className="text-xs font-semibold text-gray-400 uppercase">Top Risk Factors:</p>
-                    <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 pl-4 list-disc">
-                      {insight.factors.map((f, i) => <li key={i}>{f}</li>)}
-                    </ul>
-                  </div>
-
-                  <div className="flex justify-between items-center border-t dark:border-gray-800 pt-3 text-xs">
-                    <div>
-                      <span className="font-semibold text-gray-450">Mine Risk Index:</span>
-                      <span className="ml-1 font-bold text-gray-800 dark:text-white">{insight.riskScore}/100</span>
+                  <div className="space-y-2.5 text-xs bg-gray-50/80 dark:bg-gray-950/60 p-3 rounded-xl border border-gray-100 dark:border-gray-850">
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-gray-500 shrink-0">1. Observation:</span>
+                      <span className="text-gray-700 dark:text-gray-300 leading-snug line-clamp-2">
+                        {insight.description.split(". ")[0]}.
+                      </span>
                     </div>
-                    <Badge variant="outline" className="text-xs uppercase bg-gray-100/50 dark:bg-gray-900 border-gray-200 dark:border-gray-800">
-                      {insight.type}
-                    </Badge>
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-gray-500 shrink-0">2. Primary Factor:</span>
+                      <span className="text-gray-700 dark:text-gray-300 leading-snug line-clamp-2">
+                        {insight.factors[0] || "Operational telemetry variance detected."}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span className="font-semibold text-gray-500 shrink-0">3. Action Required:</span>
+                      <span className="text-yellow-700 dark:text-yellow-400 font-medium leading-snug line-clamp-2">
+                        {insight.recommendation.split(". ")[0]}.
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
 

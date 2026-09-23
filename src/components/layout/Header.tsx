@@ -40,6 +40,7 @@ import {
   ExternalLink,
   Calendar,
   Scale,
+  BarChart3,
   Menu,
 } from "lucide-react";
 import {
@@ -62,6 +63,7 @@ const navItems = [
   { href: "/incidents", label: "Incidents", icon: AlertTriangle },
   { href: "/gis", label: "GIS Map", icon: Layers },
   { href: "/regulations", label: "Regulations", icon: Scale },
+  { href: "/analysis", label: "Analysis", icon: BarChart3 },
   { href: "/employees", label: "Employees", icon: Users },
   { href: "/ai-insights", label: "AI Insights", icon: BrainCircuit },
 ];
