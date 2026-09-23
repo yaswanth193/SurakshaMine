@@ -320,11 +320,6 @@ export default function InspectionsPage() {
   };
 
   const filteredData = items.filter(item => {
-    if (isInspector && session?.name) {
-      if (!item.inspectorName?.toLowerCase().includes(session.name.toLowerCase())) {
-        return false;
-      }
-    }
     return (
       (item.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (item.mineName || "").toLowerCase().includes(searchQuery.toLowerCase()) ||

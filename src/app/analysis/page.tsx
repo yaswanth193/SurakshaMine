@@ -53,6 +53,11 @@ export default function AnalysisPage() {
     );
   }, [selectedMineId]);
 
+  // Prototype: reduce to 5-6 sample values for clean inspection
+  const prototypeSampleRules = useMemo(() => {
+    return selectedMine.rulesAdherence.slice(0, 6);
+  }, [selectedMine]);
+
   const totalMines = MINE_ADHERENCE_BREAKDOWN_DATA.length;
 
   const handleDownloadMineAudit = (mine: MineComplianceBreakdown) => {
@@ -210,7 +215,7 @@ export default function AnalysisPage() {
           </CardHeader>
 
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {selectedMine.rulesAdherence.map((ruleItem) => {
+            {prototypeSampleRules.map((ruleItem) => {
               const correspondingReg = STATUTORY_REGULATIONS_DATA.find(
                 (r) => r.code === ruleItem.ruleCode
               );
@@ -298,6 +303,19 @@ export default function AnalysisPage() {
                 </div>
               );
             })}
+          </div>
+
+          {/* Prototype Sample Note */}
+          <div className="p-4 bg-slate-50/60 dark:bg-slate-900/60 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
+            <span>Showing top sample of 6 statutory rules for {selectedMine.mineName} prototype analysis.</span>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => handleDownloadMineAudit(selectedMine)}
+              className="text-xs text-amber-600 dark:text-amber-400 p-0 h-auto font-semibold self-start sm:self-auto"
+            >
+              Export Full Audit PDF →
+            </Button>
           </div>
         </Card>
       </main>

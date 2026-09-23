@@ -240,8 +240,8 @@ export default function RegulationsPage() {
                   </CardHeader>
 
                   <CardContent className="p-5 pt-0 flex-1 flex flex-col justify-between space-y-4">
-                    {/* Simplified Matter: 2 to 3 Points */}
-                    <div className="space-y-2.5 my-1 py-1">
+                    {/* Simplified Matter: 2 Lines Only */}
+                    <div className="space-y-2 my-1 py-1">
                       <div className="flex items-start gap-2 text-xs">
                         <span className="font-semibold text-slate-500 dark:text-slate-400 shrink-0">1. Mandate:</span>
                         <span className="text-slate-700 dark:text-slate-300 leading-snug line-clamp-2">
@@ -252,12 +252,6 @@ export default function RegulationsPage() {
                         <span className="font-semibold text-slate-500 dark:text-slate-400 shrink-0">2. Provision:</span>
                         <span className="text-slate-700 dark:text-slate-300 leading-snug line-clamp-2">
                           {rule.mandatoryRequirements[0]}
-                        </span>
-                      </div>
-                      <div className="flex items-start gap-2 text-xs">
-                        <span className="font-semibold text-slate-500 dark:text-slate-400 shrink-0">3. Cadence:</span>
-                        <span className="text-slate-700 dark:text-slate-300 leading-snug">
-                          {rule.frequency} audit verified by {rule.authority}
                         </span>
                       </div>
                     </div>
