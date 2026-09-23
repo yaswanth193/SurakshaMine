@@ -26,7 +26,6 @@ import {
   Download,
   Search,
   CheckCircle2,
-  Building2,
   ShieldCheck,
   ShieldAlert,
   BookOpen,
@@ -134,84 +133,7 @@ export default function RegulationsPage() {
           </div>
         </div>
 
-        {/* Statutory Codex Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                  Gazetted Regulations
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                  {totalRules} Rules
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Across 4 primary statutory domains
-                </p>
-              </div>
-              <div className="h-11 w-11 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 flex items-center justify-center">
-                <BookOpen className="h-6 w-6" />
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                  Enforcing Authorities
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                  DGMS / CPCB / CCO
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Ministry of Coal & Environment
-                </p>
-              </div>
-              <div className="h-11 w-11 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 flex items-center justify-center">
-                <Scale className="h-6 w-6" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                  Statutory Provisions
-                </p>
-                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-                  55+ Clauses
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Mandatory operational standards
-                </p>
-              </div>
-              <div className="h-11 w-11 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 flex items-center justify-center">
-                <Building2 className="h-6 w-6" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                  Gazette Dossiers
-                </p>
-                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                  15 Verified
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Downloadable certified PDFs
-                </p>
-              </div>
-              <div className="h-11 w-11 rounded-xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 flex items-center justify-center">
-                <ShieldCheck className="h-6 w-6" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* STATUTORY REGULATIONS REPOSITORY */}
         <section className="space-y-6">
@@ -319,7 +241,7 @@ export default function RegulationsPage() {
 
                   <CardContent className="p-5 pt-0 flex-1 flex flex-col justify-between space-y-4">
                     {/* Simplified Matter: 2 to 3 Points */}
-                    <div className="space-y-2.5 my-1 bg-slate-50 dark:bg-slate-900/60 p-3 rounded-lg border border-slate-100 dark:border-slate-800/80">
+                    <div className="space-y-2.5 my-1 py-1">
                       <div className="flex items-start gap-2 text-xs">
                         <span className="font-semibold text-slate-500 dark:text-slate-400 shrink-0">1. Mandate:</span>
                         <span className="text-slate-700 dark:text-slate-300 leading-snug line-clamp-2">

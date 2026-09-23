@@ -135,6 +135,20 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [attendanceOverrides, setAttendanceOverrides] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("suraksha_attendance_overrides");
+        if (saved) {
+          setAttendanceOverrides(JSON.parse(saved));
+        }
+      } catch {
+        // fallback
+      }
+    }
+  }, []);
 
   // Alert Modal states
   const [alertTarget, setAlertTarget] = useState<Employee | "ALL" | null>(null);
@@ -186,21 +200,26 @@ export default function EmployeesPage() {
   });
 
   const employees: Employee[] = useMemo(() => {
-    return dbEmployees.map((e: DbEmployee) => ({
-      id: e.id,
-      name: e.name,
-      designation: e.designation,
-      phone: e.phone,
-      emergencyName: e.emergency_name,
-      emergencyPhone: e.emergency_phone,
-      attendance: e.attendance,
-      shift: e.shift,
-      bloodGroup: e.blood_group,
-      ppe: e.ppe_status,
-      training: e.training_status,
-      medical: e.medical_checkup_date || "Current",
-    }));
-  }, [dbEmployees]);
+    return dbEmployees.map((e: DbEmployee) => {
+      const isAttending = attendanceOverrides[e.id] !== undefined
+        ? attendanceOverrides[e.id]
+        : (e.attendance !== undefined ? e.attendance : true);
+      return {
+        id: e.id,
+        name: e.name,
+        designation: e.designation,
+        phone: e.phone,
+        emergencyName: e.emergency_name,
+        emergencyPhone: e.emergency_phone,
+        attendance: isAttending,
+        shift: e.shift,
+        bloodGroup: e.blood_group,
+        ppe: e.ppe_status,
+        training: e.training_status,
+        medical: e.medical_checkup_date || "Current",
+      };
+    });
+  }, [dbEmployees, attendanceOverrides]);
 
   const filtered = useMemo(() => {
     return employees.filter(
@@ -216,9 +235,25 @@ export default function EmployeesPage() {
   }, [employees]);
 
   const toggleAttendance = (id: string, currentStatus: boolean) => {
+    const newStatus = !currentStatus;
+    setAttendanceOverrides((prev) => {
+      const next = { ...prev, [id]: newStatus };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("suraksha_attendance_overrides", JSON.stringify(next));
+        } catch {
+          // ignore
+        }
+      }
+      return next;
+    });
+
+    const targetEmp = employees.find((e) => e.id === id);
+    toast.success(`${targetEmp?.name || "Employee"} marked as ${newStatus ? "Present" : "Absent"}`);
+
     updateEmployeeMutation.mutate({
       id,
-      updates: { attendance: !currentStatus },
+      updates: { attendance: newStatus },
     });
   };
 
@@ -692,10 +727,15 @@ export default function EmployeesPage() {
                       <td>
                         {canManage ? (
                           <button
-                            onClick={() => toggleAttendance(emp.id, emp.attendance)}
-                            className={`px-3 py-1 rounded text-xs font-semibold text-white transition-opacity hover:opacity-90 ${
-                              emp.attendance ? "bg-green-600" : "bg-red-600"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleAttendance(emp.id, emp.attendance);
+                            }}
+                            className={`px-3 py-1 rounded text-xs font-semibold text-white transition-all shadow-xs cursor-pointer hover:opacity-90 active:scale-95 ${
+                              emp.attendance ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700"
                             }`}
+                            title={`Click to mark as ${emp.attendance ? "Absent" : "Present"}`}
                           >
                             {emp.attendance ? "Present" : "Absent"}
                           </button>

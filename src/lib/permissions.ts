@@ -20,7 +20,6 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/gis",
     "/employees",
     "/regulations",
-    "/analysis",
     "/reports",
     "/users",
     "/settings",
@@ -68,7 +67,6 @@ export const rolePermissions: Record<UserRole, string[]> = {
     "/inspections",
     "/incidents",
     "/regulations",
-    "/analysis",
     "/reports",
     "/profile",
     "/settings"
