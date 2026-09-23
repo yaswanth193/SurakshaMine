@@ -85,6 +85,8 @@ export async function middleware(request: NextRequest) {
       .single();
     if (profile?.role) {
       userRole = profile.role as UserRole;
+    } else if (user.user_metadata?.role) {
+      userRole = user.user_metadata.role as UserRole;
     }
   }
 

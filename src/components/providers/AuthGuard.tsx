@@ -34,11 +34,28 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isAuthorized = session ? isRouteAllowed(session.role, pathname) : false;
+  if (!session) {
+    if (typeof window !== "undefined") {
+      router.replace(`/login?redirectTo=${encodeURIComponent(pathname)}`);
+    }
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center flex-col gap-2">
+        <Loader2 className="h-8 w-8 text-yellow-600 animate-spin" />
+        <span className="text-sm font-medium text-gray-500">Redirecting to login...</span>
+      </div>
+    );
+  }
+
+  const isAuthorized = isRouteAllowed(session.role, pathname);
 
   if (!isAuthorized) {
-    const dashboardPath = session?.role === "INSPECTOR" ? "/inspections" : "/dashboard";
-    const displayName = session ? getRoleDisplayName(session.role) : "Unknown User";
+    const dashboardPath =
+      session.role === "INSPECTOR"
+        ? "/inspections"
+        : session.role === "REGULATORY_AUTHORITY"
+        ? "/regulations"
+        : "/dashboard";
+    const displayName = getRoleDisplayName(session.role);
 
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4">
@@ -56,7 +73,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
               className="bg-yellow-600 hover:bg-yellow-700 text-white w-full"
               onClick={() => router.push(dashboardPath)}
             >
-              Return to Dashboard
+              Return to Your Section
             </Button>
             <Button
               variant="outline"

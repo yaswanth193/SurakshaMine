@@ -90,7 +90,7 @@ function AuthCard() {
     }
 
     setIsLoading(true);
-    const { error } = await signIn(signInEmail, signInPassword, signInRole);
+    const { data, error } = await signIn(signInEmail, signInPassword, signInRole);
     setIsLoading(false);
 
     if (error) {
@@ -98,14 +98,15 @@ function AuthCard() {
       return;
     }
 
-    toast.success(`Welcome back! Signed in as ${ROLE_OPTIONS.find((r) => r.role === signInRole)?.title}`);
+    const effectiveRole: UserRole = (data?.user as any)?.role || signInRole;
+    toast.success(`Welcome back! Signed in as ${ROLE_OPTIONS.find((r) => r.role === effectiveRole)?.title || effectiveRole}`);
 
     const redirectTo = searchParams.get("redirectTo");
     if (redirectTo) {
       router.push(redirectTo);
-    } else if (signInRole === "INSPECTOR") {
+    } else if (effectiveRole === "INSPECTOR") {
       router.push("/inspections");
-    } else if (signInRole === "REGULATORY_AUTHORITY") {
+    } else if (effectiveRole === "REGULATORY_AUTHORITY") {
       router.push("/regulations");
     } else {
       router.push("/dashboard");
@@ -127,7 +128,7 @@ function AuthCard() {
     setIsLoading(true);
     const selectedMine = MINE_OPTIONS.find((m) => m.id === signUpMineId);
 
-    const { error } = await signUp(signUpEmail, signUpPassword, {
+    const { data, error } = await signUp(signUpEmail, signUpPassword, {
       name: signUpName,
       role: signUpRole,
       mineId: signUpRole === "MINE_MANAGER" ? signUpMineId : undefined,
@@ -140,14 +141,15 @@ function AuthCard() {
       return;
     }
 
-    toast.success(`Account registered! Signed in as ${ROLE_OPTIONS.find((r) => r.role === signUpRole)?.title}`);
+    const effectiveRole: UserRole = (data?.user as any)?.role || signUpRole;
+    toast.success(`Account registered! Signed in as ${ROLE_OPTIONS.find((r) => r.role === effectiveRole)?.title || effectiveRole}`);
 
     const redirectTo = searchParams.get("redirectTo");
     if (redirectTo) {
       router.push(redirectTo);
-    } else if (signUpRole === "INSPECTOR") {
+    } else if (effectiveRole === "INSPECTOR") {
       router.push("/inspections");
-    } else if (signUpRole === "REGULATORY_AUTHORITY") {
+    } else if (effectiveRole === "REGULATORY_AUTHORITY") {
       router.push("/regulations");
     } else {
       router.push("/dashboard");
