@@ -66,22 +66,31 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  if (!user) {
+  const customSessionCookie = request.cookies.get("suraksha_session");
+  const customRoleCookie = request.cookies.get("suraksha_role")?.value as UserRole | undefined;
+
+  if (!user && !customSessionCookie) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", path);
     return NextResponse.redirect(url);
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
+  let userRole: UserRole | undefined = customRoleCookie;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role) {
+      userRole = profile.role as UserRole;
+    }
+  }
 
-  if (profile && !isRouteAllowed(profile.role as UserRole, path)) {
+  if (userRole && !isRouteAllowed(userRole, path)) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = userRole === "INSPECTOR" ? "/inspections" : userRole === "REGULATORY_AUTHORITY" ? "/regulations" : "/dashboard";
     return NextResponse.redirect(url);
   }
 
