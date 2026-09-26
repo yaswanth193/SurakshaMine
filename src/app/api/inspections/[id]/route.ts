@@ -19,6 +19,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     remarks: "remarks",
     inspectionDate: "inspection_date",
     inspectionTime: "inspection_time",
+    inspectionType: "inspection_type",
+    inspectorName: "inspector_name",
+    mineId: "mine_id",
+    zoneName: "zone_name",
   };
   for (const [key, column] of Object.entries(map)) {
     if (body[key] !== undefined) updates[column] = body[key];

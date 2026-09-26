@@ -30,11 +30,19 @@ import {
   ExternalLink,
   FileText,
   Info,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { downloadCSV } from "@/lib/exportUtils";
 import { useSession } from "@/hooks/useSession";
-import { useCompliance, useCreateCompliance, useUpdateComplianceStatus } from "@/hooks/useCompliance";
+import { 
+  useCompliance, 
+  useCreateCompliance, 
+  useUpdateComplianceStatus,
+  useUpdateCompliance,
+  useDeleteCompliance,
+} from "@/hooks/useCompliance";
 import { useMines } from "@/hooks/useMines";
 import type { ComplianceItem } from "@/types/database";
 
@@ -284,9 +292,108 @@ export default function CompliancePage() {
   const { data: items = [], isLoading: itemsLoading } = useCompliance(
     managerMineId ? { mineId: managerMineId } : {}
   );
-  const { data: mines = [] } = useMines();
   const createCompliance = useCreateCompliance();
   const updateStatus = useUpdateComplianceStatus();
+  const updateCompliance = useUpdateCompliance();
+  const deleteCompliance = useDeleteCompliance();
+  const { data: mines = [] } = useMines();
+
+  // Edit & Delete state
+  const [editingItem, setEditingItem] = useState<ComplianceItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<ComplianceItem | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+  // Edit form state
+  const [editTitle, setEditTitle] = useState("");
+  const [editMineId, setEditMineId] = useState("");
+  const [editCategory, setEditCategory] = useState<any>("Safety");
+  const [editDescription, setEditDescription] = useState("");
+  const [editAssignedTo, setEditAssignedTo] = useState("");
+  const [editDueDate, setEditDueDate] = useState("");
+  const [editPriority, setEditPriority] = useState<any>("medium");
+  const [editStatus, setEditStatus] = useState<any>("pending");
+  const [editDocumentName, setEditDocumentName] = useState("");
+
+  const handleOpenEditModal = (item: ComplianceItem) => {
+    setEditingItem(item);
+    setEditTitle(item.title || "");
+    setEditMineId(item.mine_id || "");
+    setEditCategory(item.category || "Safety");
+    setEditDescription(item.description || "");
+    setEditAssignedTo(item.assigned_to || "");
+    setEditDueDate(item.due_date ? new Date(item.due_date).toISOString().split("T")[0] : "");
+    setEditPriority(item.priority || "medium");
+    setEditStatus(item.status || "pending");
+    setEditDocumentName(item.document_name || "");
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    if (!editTitle.trim()) {
+      toast.error("Requirement name is required.");
+      return;
+    }
+
+    updateCompliance.mutate(
+      {
+        id: editingItem.id,
+        title: editTitle,
+        mineId: editMineId || undefined,
+        category: editCategory,
+        description: editDescription,
+        assignedTo: editAssignedTo,
+        dueDate: editDueDate,
+        priority: editPriority,
+        status: editStatus,
+        documentName: editDocumentName || undefined,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Compliance task updated successfully!");
+          setIsEditModalOpen(false);
+          if (selectedItem?.id === editingItem.id) {
+            setSelectedItem((prev: any) => ({
+              ...prev,
+              title: editTitle,
+              mine_id: editMineId,
+              mine_name: mines.find(m => m.id === editMineId)?.name || prev?.mine_name,
+              category: editCategory,
+              description: editDescription,
+              assigned_to: editAssignedTo,
+              due_date: editDueDate,
+              priority: editPriority,
+              status: editStatus,
+              document_name: editDocumentName,
+            }));
+          }
+          setEditingItem(null);
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.error || "Failed to update compliance task.");
+        },
+      }
+    );
+  };
+
+  const handleConfirmDelete = () => {
+    if (!itemToDelete) return;
+    deleteCompliance.mutate(itemToDelete.id, {
+      onSuccess: () => {
+        toast.success("Compliance requirement deleted.");
+        if (selectedItem?.id === itemToDelete.id) {
+          setIsDetailsOpen(false);
+          setSelectedItem(null);
+        }
+        setItemToDelete(null);
+      },
+      onError: (err: any) => {
+        toast.error(err?.response?.data?.error || "Failed to delete compliance task.");
+      },
+    });
+  };
 
   useEffect(() => {
     if (session?.role === "MINE_MANAGER" && session?.mineId) {
@@ -888,12 +995,31 @@ export default function CompliancePage() {
                         <Button 
                           variant="ghost" 
                           size="sm" 
-                          className="h-8 text-green-600 hover:text-green-700"
+                          className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/20"
+                          title="Mark Completed"
                           onClick={() => handleCompleteItem(item.id)}
                         >
                           <CheckCircle2 className="h-4 w-4" />
                         </Button>
                       )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20"
+                        title="Edit Compliance Requirement"
+                        onClick={() => handleOpenEditModal(item)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                        title="Delete Compliance Requirement"
+                        onClick={() => setItemToDelete(item)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -1221,6 +1347,29 @@ export default function CompliancePage() {
 
               <DialogFooter className="mt-6 flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDetailsOpen(false)}>Close</Button>
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => {
+                    handleOpenEditModal(selectedItem);
+                    setIsDetailsOpen(false);
+                  }}
+                >
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="destructive"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setItemToDelete(selectedItem);
+                    setIsDeleteModalOpen(true);
+                    setIsDetailsOpen(false);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
                 {getUpdatedStatus(selectedItem) !== "completed" && (
                   <Button 
                     type="button" 
@@ -1339,6 +1488,161 @@ export default function CompliancePage() {
               <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700 text-white">Apply Filters</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Compliance Task Dialog */}
+      <Dialog open={isEditModalOpen} onOpenChange={(open) => !open && setIsEditModalOpen(false)}>
+        <DialogContent className="sm:max-w-lg rounded-2xl bg-white dark:bg-gray-950 p-6 border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold tracking-tight">Edit Compliance Task</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+              Update task requirements, due date, status, or assigned details.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveEdit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-compliance-title" className="text-sm font-medium">Task Title *</Label>
+              <Input
+                id="edit-compliance-title"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                required
+                className="rounded-4xl"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-compliance-mine" className="text-sm font-medium">Mine Location</Label>
+                <select
+                  id="edit-compliance-mine"
+                  value={editMineId}
+                  onChange={(e) => setEditMineId(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+                >
+                  <option value="">Select Mine</option>
+                  {mines.map((m: any) => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-compliance-cat" className="text-sm font-medium">Category</Label>
+                <select
+                  id="edit-compliance-cat"
+                  value={editCategory}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+                >
+                  <option value="Safety">Safety</option>
+                  <option value="Environment">Environment</option>
+                  <option value="Labour">Labour</option>
+                  <option value="Production">Production</option>
+                  <option value="Statutory">Statutory</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-compliance-priority" className="text-sm font-medium">Priority</Label>
+                <select
+                  id="edit-compliance-priority"
+                  value={editPriority}
+                  onChange={(e) => setEditPriority(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-compliance-status" className="text-sm font-medium">Status</Label>
+                <select
+                  id="edit-compliance-status"
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-compliance-due" className="text-sm font-medium">Due Date</Label>
+              <Input
+                id="edit-compliance-due"
+                type="date"
+                value={editDueDate}
+                onChange={(e) => setEditDueDate(e.target.value)}
+                className="rounded-4xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-compliance-doc" className="text-sm font-medium">Reference Document</Label>
+              <Input
+                id="edit-compliance-doc"
+                value={editDocumentName}
+                placeholder="e.g. DGMS-Standard-Report.pdf"
+                onChange={(e) => setEditDocumentName(e.target.value)}
+                className="rounded-4xl"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-compliance-desc" className="text-sm font-medium">Requirement Description</Label>
+              <textarea
+                id="edit-compliance-desc"
+                rows={3}
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full min-h-[80px] rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-2 text-sm outline-none focus-visible:border-yellow-600 focus-visible:ring-[3px] focus-visible:ring-yellow-600/20"
+              />
+            </div>
+
+            <DialogFooter className="mt-6 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700 text-white" disabled={updateCompliance.isPending}>
+                {updateCompliance.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Compliance Confirmation Dialog */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={(open) => !open && setIsDeleteModalOpen(false)}>
+        <DialogContent className="sm:max-w-md rounded-2xl bg-white dark:bg-gray-950 p-6 border border-gray-200 dark:border-gray-800">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Delete Compliance Task
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Are you sure you want to permanently delete <strong className="text-gray-900 dark:text-white">&ldquo;{itemToDelete?.title}&rdquo;</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setIsDeleteModalOpen(false)}>Cancel</Button>
+            <Button 
+              type="button" 
+              variant="destructive" 
+              onClick={handleConfirmDelete}
+              disabled={deleteCompliance.isPending}
+            >
+              {deleteCompliance.isPending ? "Deleting..." : "Delete Permanently"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

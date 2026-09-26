@@ -26,9 +26,17 @@ import {
   Filter,
   Navigation,
   CheckCircle2,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useInspections, useCreateInspection, useUpdateInspectionStatus } from "@/hooks/useInspections";
+import { 
+  useInspections, 
+  useCreateInspection, 
+  useUpdateInspectionStatus, 
+  useUpdateInspection, 
+  useDeleteInspection 
+} from "@/hooks/useInspections";
 import { useMines } from "@/hooks/useMines";
 import { useSession } from "@/hooks/useSession";
 import { inspectionService, defaultZones } from "@/lib/inspectionService";
@@ -69,6 +77,8 @@ export default function InspectionsPage() {
   const { data: dbMines = [] } = useMines();
   const createInspection = useCreateInspection();
   const updateInspectionStatus = useUpdateInspectionStatus();
+  const updateInspection = useUpdateInspection();
+  const deleteInspection = useDeleteInspection();
 
   const mines = useMemo(() => {
     return dbMines.map(m => ({
@@ -101,10 +111,14 @@ export default function InspectionsPage() {
   }, [dbInspections, mines]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCompletedOnly, setShowCompletedOnly] = useState(false);
   
   // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<any>(null);
+  const [editingInspection, setEditingInspection] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [inspectionToDelete, setInspectionToDelete] = useState<any>(null);
 
   // Form state
   const [title, setTitle] = useState("");
@@ -118,6 +132,19 @@ export default function InspectionsPage() {
   const [severity, setSeverity] = useState<any>("medium");
   const [remarks, setRemarks] = useState("");
   const [evidenceName, setEvidenceName] = useState("");
+
+  // Edit form state
+  const [editTitle, setEditTitle] = useState("");
+  const [editMineId, setEditMineId] = useState("");
+  const [editZoneName, setEditZoneName] = useState("");
+  const [editInspectionType, setEditInspectionType] = useState<any>("Safety");
+  const [editInspectorName, setEditInspectorName] = useState("");
+  const [editInspectionDate, setEditInspectionDate] = useState("");
+  const [editInspectionTime, setEditInspectionTime] = useState("");
+  const [editObservation, setEditObservation] = useState("");
+  const [editSeverity, setEditSeverity] = useState<any>("medium");
+  const [editStatus, setEditStatus] = useState<any>("scheduled");
+  const [editRemarks, setEditRemarks] = useState("");
   
   // Geolocation state
   const [latitude, setLatitude] = useState<number | undefined>(undefined);
@@ -127,6 +154,90 @@ export default function InspectionsPage() {
   const [gpsStatus, setGpsStatus] = useState("");
   
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const handleOpenEditModal = (item: any) => {
+    setEditingInspection(item);
+    setEditTitle(item.title || "");
+    setEditMineId(item.mineId || item.mine_id || "");
+    setEditZoneName(item.zoneName || item.zone_name || "");
+    setEditInspectionType(item.inspectionType || item.inspection_type || "Safety");
+    setEditInspectorName(item.inspectorName || item.inspector_name || "");
+    setEditInspectionDate(item.inspectionDate || item.inspection_date || new Date().toISOString().split("T")[0]);
+    setEditInspectionTime(item.inspectionTime || item.inspection_time || "09:00");
+    setEditSeverity(item.severity || "medium");
+    setEditStatus(item.status || "scheduled");
+    setEditObservation(item.observation || "");
+    setEditRemarks(item.remarks || "");
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInspection) return;
+    if (!editTitle.trim()) {
+      toast.error("Inspection title is required.");
+      return;
+    }
+
+    updateInspection.mutate(
+      {
+        id: editingInspection.id,
+        title: editTitle,
+        mineId: editMineId,
+        zoneName: editZoneName,
+        inspectionType: editInspectionType,
+        inspectorName: editInspectorName,
+        inspectionDate: editInspectionDate,
+        inspectionTime: editInspectionTime,
+        severity: editSeverity,
+        status: editStatus,
+        observation: editObservation,
+        remarks: editRemarks,
+      },
+      {
+        onSuccess: () => {
+          toast.success("Inspection updated successfully!");
+          setIsEditModalOpen(false);
+          if (selectedInspection?.id === editingInspection.id) {
+            setSelectedInspection((prev: any) => ({
+              ...prev,
+              title: editTitle,
+              mineId: editMineId,
+              zoneName: editZoneName,
+              inspectionType: editInspectionType,
+              inspectorName: editInspectorName,
+              inspectionDate: editInspectionDate,
+              inspectionTime: editInspectionTime,
+              severity: editSeverity,
+              status: editStatus,
+              observation: editObservation,
+              remarks: editRemarks,
+            }));
+          }
+          setEditingInspection(null);
+        },
+        onError: (err: any) => {
+          toast.error(err?.response?.data?.error || "Failed to update inspection.");
+        },
+      }
+    );
+  };
+
+  const handleConfirmDelete = () => {
+    if (!inspectionToDelete) return;
+    deleteInspection.mutate(inspectionToDelete.id, {
+      onSuccess: () => {
+        toast.success("Inspection record deleted successfully.");
+        if (selectedInspection?.id === inspectionToDelete.id) {
+          setSelectedInspection(null);
+        }
+        setInspectionToDelete(null);
+      },
+      onError: (err: any) => {
+        toast.error(err?.response?.data?.error || "Failed to delete inspection.");
+      },
+    });
+  };
 
   useEffect(() => {
     setInspectionDate(new Date().toISOString().split("T")[0]);
@@ -330,6 +441,16 @@ export default function InspectionsPage() {
     );
   });
 
+  const activeItems = useMemo(() => {
+    return filteredData.filter(item => item.status !== "completed" && item.status !== "closed");
+  }, [filteredData]);
+
+  const completedItems = useMemo(() => {
+    return filteredData.filter(item => item.status === "completed" || item.status === "closed");
+  }, [filteredData]);
+
+  const displayedItems = showCompletedOnly ? completedItems : activeItems;
+
   const stats = useMemo(() => {
     let scheduled = 0;
     let inProgress = 0;
@@ -406,16 +527,21 @@ export default function InspectionsPage() {
               <p className="text-2xl font-bold text-yellow-600">{stats.inProgress}</p>
             </CardContent>
           </Card>
-          <Card className="border-green-200">
-            <CardContent className="p-4">
-              <p className="text-sm text-green-600">Completed</p>
-              <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+          <Card className="border-green-200 cursor-pointer hover:border-green-300 transition-colors" onClick={() => setShowCompletedOnly(true)}>
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm text-green-600 font-medium">Completed</p>
+                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+              </div>
+              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                View Separate List &rarr;
+              </Badge>
             </CardContent>
           </Card>
         </div>
 
         {/* Search & Scope */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
           <div className="flex items-center gap-2 flex-1 max-w-md">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -427,19 +553,66 @@ export default function InspectionsPage() {
               />
             </div>
           </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" /> Filter
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant={showCompletedOnly ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowCompletedOnly(!showCompletedOnly)}
+              className={showCompletedOnly
+                ? "bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs gap-1.5 shadow-xs"
+                : "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-xs font-medium gap-1.5"
+              }
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              {showCompletedOnly ? "← Show Active Inspections" : `Completed Inspections (${stats.completed})`}
+            </Button>
+            <Button variant="outline" size="sm">
+              <Filter className="h-4 w-4 mr-2" /> Filter
+            </Button>
+          </div>
         </div>
+
+        {/* View Indicator Banner */}
+        {showCompletedOnly ? (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-sm">
+            <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-medium">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+              <span>Viewing <strong>Completed & Verified Inspections Archive</strong> ({completedItems.length}). Active investigations are hidden.</span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 self-start sm:self-auto"
+              onClick={() => setShowCompletedOnly(false)}
+            >
+              ← Back to Active Investigations
+            </Button>
+          </div>
+        ) : (
+          <div className="mb-6 flex items-center justify-between text-xs text-muted-foreground">
+            <span>Showing <strong>{activeItems.length} active</strong> mine inspections. Completed inspections are kept in a separate list.</span>
+            {stats.completed > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowCompletedOnly(true)}
+                className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <span>View {stats.completed} Completed Inspections &rarr;</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Inspections Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredData.length === 0 ? (
+          {displayedItems.length === 0 ? (
             <div className="col-span-full p-8 text-center text-gray-500 dark:text-gray-400 border border-dashed rounded-2xl">
-              No matching inspections found.
+              {showCompletedOnly 
+                ? "No completed inspections recorded yet."
+                : "No matching active inspections found."}
             </div>
           ) : (
-            filteredData.map((item) => (
+            displayedItems.map((item) => (
               <Card key={item.id} className="hover:shadow-lg transition-shadow flex flex-col justify-between">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between gap-2">
@@ -497,7 +670,7 @@ export default function InspectionsPage() {
                     </div>
                   )}
 
-                  <div className="mt-4 flex gap-2 border-t pt-3">
+                  <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -510,7 +683,7 @@ export default function InspectionsPage() {
                       item.status === "scheduled" || item.status === "pending" ? (
                         <Button
                           size="sm"
-                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white"
+                          className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white text-xs"
                           onClick={() => {
                             updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
                             toast.success(`Started investigation for ${item.id} — marked In-Progress`);
@@ -521,7 +694,7 @@ export default function InspectionsPage() {
                       ) : item.status === "in-progress" ? (
                         <Button
                           size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs"
                           onClick={() => {
                             updateInspectionStatus.mutate({ id: item.id, status: "completed" });
                             toast.success(`Completed investigation for ${item.id} — marked Done`);
@@ -532,7 +705,7 @@ export default function InspectionsPage() {
                       ) : item.status === "requires-action" ? (
                         <Button
                           size="sm"
-                          className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                          className="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs"
                           onClick={() => {
                             updateInspectionStatus.mutate({ id: item.id, status: "in-progress" });
                             toast.info(`Re-opened investigation for ${item.id}`);
@@ -545,12 +718,35 @@ export default function InspectionsPage() {
                           size="sm"
                           variant="outline"
                           disabled
-                          className="flex-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 font-semibold"
+                          className="flex-1 bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 font-semibold text-xs"
                         >
                           Done Investigation ✓
                         </Button>
                       )
                     ) : null}
+
+                    {canManageInspection && (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2.5 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30 border-blue-200 dark:border-blue-900"
+                          title="Edit Inspection Record"
+                          onClick={() => handleOpenEditModal(item)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-900"
+                          title="Delete Inspection Record"
+                          onClick={() => setInspectionToDelete(item)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -886,7 +1082,33 @@ export default function InspectionsPage() {
             </div>
           )}
           <DialogFooter className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 mt-4">
-            <Button variant="outline" onClick={() => setSelectedInspection(null)}>Close Details</Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setSelectedInspection(null)}>Close Details</Button>
+              {canManageInspection && selectedInspection && (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 gap-1 text-xs"
+                    onClick={() => {
+                      handleOpenEditModal(selectedInspection);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 gap-1 text-xs"
+                    onClick={() => {
+                      setInspectionToDelete(selectedInspection);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </Button>
+                </>
+              )}
+            </div>
             {canManageInspection && selectedInspection && (
               <div className="flex flex-wrap items-center gap-2">
                 {selectedInspection.status !== "in-progress" && selectedInspection.status !== "completed" && (
@@ -939,6 +1161,173 @@ export default function InspectionsPage() {
                 )}
               </div>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Inspection Dialog Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={(open) => !open && setIsEditModalOpen(false)}>
+        <DialogContent className="sm:max-w-lg rounded-2xl bg-white dark:bg-gray-950 p-6 border border-gray-200 dark:border-gray-800 max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold tracking-tight">Edit Inspection Details</DialogTitle>
+            <DialogDescription className="text-sm text-gray-500">
+              Update audit findings, assigned inspector, or colliery information.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveEdit} className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Inspection Title *</Label>
+              <Input
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                placeholder="e.g. Mandatory Ventilation & Methane Check"
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Colliery / Mine</Label>
+                <select
+                  value={editMineId}
+                  onChange={e => setEditMineId(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none"
+                >
+                  {mines.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Zone / Seam</Label>
+                <Input
+                  value={editZoneName}
+                  onChange={e => setEditZoneName(e.target.value)}
+                  placeholder="e.g. Pit Area A"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Inspection Type</Label>
+                <select
+                  value={editInspectionType}
+                  onChange={e => setEditInspectionType(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none"
+                >
+                  <option value="Safety">Safety</option>
+                  <option value="Environment">Environment</option>
+                  <option value="Labour">Labour</option>
+                  <option value="Production">Production</option>
+                  <option value="Statutory Compliance">Statutory Compliance</option>
+                  <option value="General">General</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Inspector Name</Label>
+                <Input
+                  value={editInspectorName}
+                  onChange={e => setEditInspectorName(e.target.value)}
+                  placeholder="Auditor / Inspector name"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Date</Label>
+                <Input
+                  type="date"
+                  value={editInspectionDate}
+                  onChange={e => setEditInspectionDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Severity</Label>
+                <select
+                  value={editSeverity}
+                  onChange={e => setEditSeverity(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Status</Label>
+                <select
+                  value={editStatus}
+                  onChange={e => setEditStatus(e.target.value)}
+                  className="h-9 w-full rounded-4xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 px-3 py-1 text-sm outline-none"
+                >
+                  <option value="scheduled">Scheduled</option>
+                  <option value="in-progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="requires-action">Requires Action</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Observation Findings</Label>
+              <textarea
+                value={editObservation}
+                onChange={e => setEditObservation(e.target.value)}
+                rows={3}
+                placeholder="Findings and statutory compliance remarks..."
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-2.5 text-sm outline-none"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Internal Remarks</Label>
+              <Input
+                value={editRemarks}
+                onChange={e => setEditRemarks(e.target.value)}
+                placeholder="Additional notes..."
+              />
+            </div>
+
+            <DialogFooter className="pt-2 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsEditModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="bg-yellow-600 hover:bg-yellow-700 text-white" disabled={updateInspection.isPending}>
+                {updateInspection.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!inspectionToDelete} onOpenChange={(open) => !open && setInspectionToDelete(null)}>
+        <DialogContent className="sm:max-w-md bg-white dark:bg-gray-950 p-6 border border-gray-200 dark:border-gray-800 rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-red-600 flex items-center gap-2">
+              <Trash2 className="h-5 w-5" /> Delete Inspection Record
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 mt-2">
+              Are you sure you want to delete inspection <strong>"{inspectionToDelete?.title}"</strong>? This will permanently remove it from the colliery safety ledger.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setInspectionToDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={handleConfirmDelete}
+              disabled={deleteInspection.isPending}
+            >
+              {deleteInspection.isPending ? "Deleting..." : "Delete Permanently"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

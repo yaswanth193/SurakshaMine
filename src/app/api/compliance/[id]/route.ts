@@ -19,6 +19,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     assignedTo: "assigned_to",
     description: "description",
     dueDate: "due_date",
+    mineId: "mine_id",
+    documentName: "document_name",
   };
   for (const [key, column] of Object.entries(map)) {
     if (body[key] !== undefined) updates[column] = body[key];
