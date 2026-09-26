@@ -149,7 +149,24 @@ export function useSession() {
 
   const signIn = async (email: string, password: string, selectedRole?: UserRole) => {
     try {
-      const res = await supabase.auth.signInWithPassword({ email, password });
+      let res = await supabase.auth.signInWithPassword({ email, password });
+      
+      // If error might be due to unconfirmed email or missing profile, attempt server-side sync and retry
+      if (res.error) {
+        try {
+          const syncRes = await fetch("/api/auth/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email, role: selectedRole }),
+          });
+          if (syncRes.ok) {
+            res = await supabase.auth.signInWithPassword({ email, password });
+          }
+        } catch {
+          // ignore
+        }
+      }
+
       if (!res.error && res.data?.user) {
         await loadProfile(selectedRole);
         return res;
@@ -158,7 +175,7 @@ export function useSession() {
       // ignore
     }
 
-    // Custom fallback login if Supabase auth fails (allows custom credentials for all 5 roles)
+    // Custom fallback login if Supabase auth credentials fail or offline
     if (selectedRole) {
       const customSession: UserSession = {
         userId: `user-${Date.now()}`,
@@ -182,33 +199,59 @@ export function useSession() {
     metadata: { name: string; role: UserRole; mineId?: string; mineName?: string }
   ) => {
     let authUserId: string | null = null;
+    let registeredSuccessfully = false;
+
+    // 1. First register via secure server route (bypasses RLS, creates profile, auto-confirms email)
     try {
-      const res = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: metadata.name,
-            role: metadata.role,
-            mine_id: metadata.mineId,
-            mine_name: metadata.mineName,
-          },
-        },
+      const regRes = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          password,
+          name: metadata.name,
+          role: metadata.role,
+          mineId: metadata.mineId,
+          mineName: metadata.mineName,
+        }),
       });
 
-      if (!res.error && res.data?.user) {
-        authUserId = res.data.user.id;
-        try {
-          await supabase.from("profiles").upsert({
-            id: res.data.user.id,
-            name: metadata.name,
-            role: metadata.role,
-            mine_id: metadata.mineId || null,
-          });
-        } catch {
-          // ignore
-        }
+      if (regRes.ok) {
+        const regData = await regRes.json();
+        authUserId = regData?.user?.id || null;
+        registeredSuccessfully = true;
       }
+    } catch {
+      // fallback to client registration if server route unreachable
+    }
+
+    // 2. Client fallback registration if server endpoint was not reached
+    if (!registeredSuccessfully) {
+      try {
+        const res = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name: metadata.name,
+              role: metadata.role,
+              mine_id: metadata.mineId,
+              mine_name: metadata.mineName,
+            },
+          },
+        });
+        if (!res.error && res.data?.user) {
+          authUserId = res.data.user.id;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3. Immediately sign in to establish active Supabase session
+    try {
+      await supabase.auth.signInWithPassword({ email, password });
+      await loadProfile(metadata.role);
     } catch {
       // ignore
     }
